@@ -1,121 +1,114 @@
 /* ==============================================================================
-   RegAssist DZ — Assistant Juridique (Banque d'Algérie)
-   Direction Artistique : « 2026 Flagship LegalTech Workbench »
-   Palette Jour : Lin d'archive, Travertin & Encre Expresso (Harvey / Claude / FT)
-   Palette Nuit : Matte Carbon-Zinc, Albâtre & Or Souverain (Linear / Cursor / Raycast)
+   RegAssist DZ - Assistant juridique (projet éducatif non officiel)
+   Feuille de style de l'interface locale. Aucune ressource externe (CSP « self »).
+   Charte sobre et institutionnelle : fond clair gris-bleu, bleu nuit pour la structure,
+   bleu pour les liens, sable pour les mises en garde. Thème sombre : suit le système.
+   Ni logo ni emblème : cet outil n'est pas un produit de la Banque d'Algérie.
    ============================================================================== */
 
 :root {
   color-scheme: light dark;
 
-  /* --- Mode Clair : Beige lin d'archive, Travertin & Encre Expresso (Défaut) --- */
-  --bg-canvas:       #EFECE6;  /* Toile lin chaud / avoine — zéro blanc clinique */
-  --bg-chrome:       #E6E1D6;  /* Pierre travertin chaude pour volet & barre supérieure */
-  --bg-surface:      #FAF8F4;  /* Papier ivoire chaud pour les cartes */
-  --bg-elevated:     #FFFFFF;  /* Blanc ivoire pur pour cartes & capsule de commande */
-  --bg-subtle:       #F2EDE4;  /* Sable chaud pour pavés Bento & badges neutres */
-  --bg-quote:        #F4EFE6;  /* Vélin d'archive chaud pour les extraits officiels */
-  --bg-notice:       #EAE3D5;  /* Sable doré pour l'encart de mise en garde */
+  /* --- Thème clair (défaut) --- */
+  --bg-canvas:       #F2F5F7;  /* fond de page */
+  --bg-chrome:       #FFFFFF;  /* barre supérieure et volet latéral */
+  --bg-surface:      #FFFFFF;  /* cartes */
+  --bg-elevated:     #FFFFFF;  /* zone de saisie */
+  --bg-subtle:       #EDF1F5;  /* bandeau de métadonnées, pastilles neutres */
+  --bg-quote:        #F7F9FB;  /* extraits officiels */
+  --bg-notice:       #FBF6EA;  /* encart de mise en garde (sable clair) */
 
-  /* Typographie & Contraste (Encre expresso profonde > 14:1) */
-  --text-primary:    #1C1917;  /* Expresso profond pierre-950 */
-  --text-secondary:  #44403C;  /* Pierre-700 pour corps de texte et extraits */
-  --text-muted:      #78716C;  /* Pierre-500 pour libellés et métadonnées */
+  /* Texte */
+  --text-primary:    #1B2733;
+  --text-secondary:  #3A4350;
+  --text-muted:      #5C6877;
 
-  /* Filets & Bordures d'atelier */
-  --border-subtle:   #DFD9CE;  /* Filet pierre chaude 1px */
-  --border-strong:   #C8C0B3;  /* Filet d'accentuation et survol */
+  /* Filets */
+  --border-subtle:   #D9E0E7;
+  --border-strong:   #B4C0CC;
 
-  /* Accents souverains : Bronze cognac & Terre cuite noble */
-  --accent-primary:  #9A4B26;  /* Terre cuite chaude / Bronze souverain */
-  --accent-hover:    #7C3A1B;
-  --accent-subtle:   #F7EDE8;  /* Teinte terre cuite douce pour pastilles [S1] */
-  --accent-border:   #E2BFB0;
+  /* Accent : bleu des liens, bleu nuit au survol */
+  --accent-primary:  #16537C;
+  --accent-hover:    #123663;
+  --accent-subtle:   #E6F0F7;
+  --accent-border:   #B3CFE3;
 
   /* Boutons d'action principale */
-  --btn-primary-bg:    #1C1917;  /* Expresso profond */
-  --btn-primary-hover: #332E2A;
-  --btn-primary-text:  #FAF8F4;  /* Ivoire chaud */
+  --btn-primary-bg:    #123663;
+  --btn-primary-hover: #0D2A4E;
+  --btn-primary-text:  #FFFFFF;
 
-  /* Statuts réglementaires forensiques */
-  --badge-cited-bg:     #EBF3ED;  /* Sauge botanique douce pour « Cité dans la réponse » */
-  --badge-cited-text:   #235332;  /* Vert forêt profond */
-  --badge-cited-border: #B9D5C0;
-  --ok:                 #235332;
+  /* Statuts */
+  --badge-cited-bg:     #E8F3EC;
+  --badge-cited-text:   #1F5E34;
+  --badge-cited-border: #B5D6C1;
+  --ok:                 #1F5E34;
 
-  --warn-bg: #F7F1E6;  --warn-fg: #8C531B;  --warn-bd: #E3D1B5;
-  --err-bg:  #FAF0EE;  --err-fg:  #9C2E24;  --err-bd:  #ECC8C3;
-  --info-bg: #F0EDE6;  --info-fg: #5C5245;  --info-bd: #DCD4C7;
+  --warn-bg: #FBF5E8;  --warn-fg: #7A5A1E;  --warn-bd: #DFCB9F;
+  --err-bg:  #FBEFEE;  --err-fg:  #A12D24;  --err-bd:  #EBC7C3;
+  --info-bg: #EEF3F8;  --info-fg: #3F546B;  --info-bd: #CBD8E5;
 
-  /* Rayons & Élévations douces */
-  --radius-xs: 4px;
-  --radius-sm: 6px;
-  --radius-md: 10px;
-  --radius-lg: 14px;
-  --radius-pill: 999px;
+  /* Rayons et ombres : plats, discrets */
+  --radius-xs: 2px;
+  --radius-sm: 3px;
+  --radius-md: 4px;
+  --radius-lg: 6px;
+  --radius-pill: 3px;
 
-  --shadow-card:     0 2px 8px rgba(28, 25, 23, 0.04), 0 1px 2px rgba(28, 25, 23, 0.03);
-  --shadow-composer: 0 12px 32px rgba(28, 25, 23, 0.08), 0 2px 8px rgba(28, 25, 23, 0.04);
-  --shadow-focus:    0 0 0 3px rgba(154, 75, 38, 0.18);
+  --shadow-card:     0 1px 2px rgba(18, 54, 99, 0.06);
+  --shadow-composer: 0 2px 8px rgba(18, 54, 99, 0.10);
+  --shadow-focus:    0 0 0 3px rgba(2, 112, 186, 0.25);
 
-  /* Polices système locales (Zéro requête externe) */
-  --font-sans:  system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
-  --font-legal: "Georgia", "Cambria", "Times New Roman", serif;
+  /* Polices système locales (aucune requête externe) */
+  --font-sans:  "Segoe UI", system-ui, -apple-system, Roboto, "Helvetica Neue", Arial, sans-serif;
+  --font-legal: Georgia, Cambria, "Times New Roman", serif;
   --font-mono:  ui-monospace, "Cascadia Mono", "Segoe UI Mono", Menlo, Consolas, monospace;
 }
 
-/* ==============================================================================
-   Mode Sombre : « Matte Carbon-Zinc & Sovereign Gold » (ZÉRO MARRON, ZÉRO BLEU !)
-   Harmonie exacte avec Linear, Cursor, Raycast et Claude Dark
-   ============================================================================== */
+/* --- Thème sombre : bleu nuit --- */
 @media (prefers-color-scheme: dark) {
   :root {
-    --bg-canvas:       #09090B;  /* Pure matte carbon-zinc 950 */
-    --bg-chrome:       #0C0C0E;  /* Deep zinc sidebar & topbar */
-    --bg-surface:      #121215;  /* Crisp zinc-900 card surface */
-    --bg-elevated:     #18181C;  /* Elevated floating cards & command bar */
-    --bg-subtle:       #1F1F24;  /* Metadata strip & subtle pills */
-    --bg-quote:        #141418;  /* Verbatim excerpt block */
-    --bg-notice:       #16161A;  /* Sleek dark zinc notice bar */
+    --bg-canvas:       #0B1624;
+    --bg-chrome:       #0F1D30;
+    --bg-surface:      #132238;
+    --bg-elevated:     #172A44;
+    --bg-subtle:       #1B3050;
+    --bg-quote:        #101E33;
+    --bg-notice:       #1C2230;
 
-    /* Typographie crisp & lisible */
-    --text-primary:    #FAFAFA;  /* Pure crisp zinc-50 white */
-    --text-secondary:  #D4D4D8;  /* Zinc-300 readable prose */
-    --text-muted:      #71717A;  /* Zinc-500 uppercase labels */
+    --text-primary:    #E8EEF5;
+    --text-secondary:  #C5D0DD;
+    --text-muted:      #8A9BB0;
 
-    /* Filets graphite zinc 1px */
-    --border-subtle:   #27272A;  /* Crisp 1px zinc-800 hairline */
-    --border-strong:   #3F3F46;  /* Zinc-700 interactive border */
+    --border-subtle:   #243652;
+    --border-strong:   #35506F;
 
-    /* Accents or souverain & ambre chaud */
-    --accent-primary:  #E4A853;  /* Refined Sovereign Gold */
-    --accent-hover:    #F0B865;
-    --accent-subtle:   rgba(228, 168, 83, 0.12);
-    --accent-border:   rgba(228, 168, 83, 0.32);
+    --accent-primary:  #6DB3E8;
+    --accent-hover:    #8CC6F0;
+    --accent-subtle:   rgba(109, 179, 232, 0.14);
+    --accent-border:   rgba(109, 179, 232, 0.35);
 
-    /* Bouton principal blanc immaculé (Style flagship Linear / Vercel) */
-    --btn-primary-bg:    #FAFAFA;
-    --btn-primary-hover: #E4E4E7;
-    --btn-primary-text:  #09090B;  /* Texte carbone profond sur bouton blanc */
+    --btn-primary-bg:    #0270BA;
+    --btn-primary-hover: #1783D1;
+    --btn-primary-text:  #FFFFFF;
 
-    /* Statuts réglementaires en mode sombre */
-    --badge-cited-bg:     rgba(16, 185, 129, 0.12);
+    --badge-cited-bg:     rgba(52, 211, 153, 0.12);
     --badge-cited-text:   #34D399;
-    --badge-cited-border: rgba(16, 185, 129, 0.28);
+    --badge-cited-border: rgba(52, 211, 153, 0.28);
     --ok:                 #34D399;
 
-    --warn-bg: #201A10;  --warn-fg: #F59E0B;  --warn-bd: #453014;
+    --warn-bg: #231E12;  --warn-fg: #D9B26A;  --warn-bd: #4A3E22;
     --err-bg:  #241414;  --err-fg:  #F87171;  --err-bd:  #4C1D1D;
-    --info-bg: #18181B;  --info-fg: #A1A1AA;  --info-bd: #27272A;
+    --info-bg: #15253A;  --info-fg: #9FB3C9;  --info-bd: #243652;
 
-    --shadow-card:     0 4px 20px rgba(0, 0, 0, 0.45), 0 1px 0 rgba(255, 255, 255, 0.04) inset;
-    --shadow-composer: 0 12px 36px rgba(0, 0, 0, 0.65), 0 1px 0 rgba(255, 255, 255, 0.06) inset;
-    --shadow-focus:    0 0 0 3px rgba(228, 168, 83, 0.25);
+    --shadow-card:     0 1px 3px rgba(0, 0, 0, 0.35);
+    --shadow-composer: 0 4px 16px rgba(0, 0, 0, 0.45);
+    --shadow-focus:    0 0 0 3px rgba(109, 179, 232, 0.30);
   }
 }
 
 /* ==============================================================================
-   Base & Structure Principale
+   Base et structure
    ============================================================================== */
 * {
   box-sizing: border-box;
@@ -161,7 +154,7 @@ h1, h2, h3, h4, p {
 }
 
 /* ==============================================================================
-   En-tête Supérieur Architectural
+   Barre supérieure
    ============================================================================== */
 .topbar {
   display: flex;
@@ -171,7 +164,7 @@ h1, h2, h3, h4, p {
   padding: 10px 24px;
   background: var(--bg-chrome);
   color: var(--text-primary);
-  border-bottom: 1px solid var(--border-subtle);
+  border-bottom: 3px solid var(--btn-primary-bg);
   flex-shrink: 0;
 }
 
@@ -182,11 +175,11 @@ h1, h2, h3, h4, p {
 }
 
 .brand-title {
-  font-family: var(--font-legal);
-  font-size: 1.05rem;
+  font-family: var(--font-sans);
+  font-size: 1rem;
   font-weight: 700;
-  letter-spacing: .03em;
-  color: var(--text-primary);
+  letter-spacing: .08em;
+  color: var(--accent-hover);
 }
 
 .brand-sub {
@@ -214,7 +207,7 @@ h1, h2, h3, h4, p {
 }
 
 /* ==============================================================================
-   Boutons & Actions Tactiles
+   Boutons
    ============================================================================== */
 .btn {
   font: inherit;
@@ -240,12 +233,10 @@ h1, h2, h3, h4, p {
   background: var(--btn-primary-bg);
   color: var(--btn-primary-text);
   border: none;
-  box-shadow: var(--shadow-card);
 }
 
 .btn-primary:hover:not(:disabled) {
   background: var(--btn-primary-hover);
-  transform: translateY(-1px);
 }
 
 .btn-ghost {
@@ -295,7 +286,7 @@ h1, h2, h3, h4, p {
 }
 
 /* ==============================================================================
-   Bandeau de Mise en Garde (Encart éditorial discret)
+   Bandeau de mise en garde
    ============================================================================== */
 .notice {
   margin: 8px 24px 2px;
@@ -314,7 +305,7 @@ h1, h2, h3, h4, p {
 }
 
 /* ==============================================================================
-   Disposition en Grille : Volet Latéral & Espace de Travail
+   Disposition : volet latéral et espace de travail
    ============================================================================== */
 .layout {
   flex: 1;
@@ -404,7 +395,7 @@ h1, h2, h3, h4, p {
 }
 
 /* ==============================================================================
-   Espace de Travail Principal (Workbench Sans Cadres Superflus)
+   Espace de travail
    ============================================================================== */
 .workspace {
   display: flex;
@@ -462,8 +453,8 @@ h1, h2, h3, h4, p {
 }
 
 /* ==============================================================================
-   Séparation Architecturale Épure : Volets Sources et Réponse
-   Élimine l'effet « boîtes russes » : fond transparent et séparateur vertical unique
+   Volets Sources et Réponse
+   Fond transparent, un seul séparateur vertical
    ============================================================================== */
 .panes {
   flex: 1;
@@ -530,7 +521,7 @@ h1, h2, h3, h4, p {
 }
 
 /* ==============================================================================
-   Cartes de Sources & Bandeau Horizontal de Métadonnées (4 Colonnes)
+   Cartes de sources et bandeau de métadonnées (4 colonnes)
    ============================================================================== */
 .source {
   margin-bottom: 14px;
@@ -608,7 +599,7 @@ h1, h2, h3, h4, p {
   gap: 2px 12px;
   background: var(--bg-subtle);
   border: 1px solid var(--border-subtle);
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   padding: 8px 12px;
   margin: 10px 0;
 }
@@ -737,7 +728,7 @@ h1, h2, h3, h4, p {
   color: var(--text-primary);
   text-decoration: none;
   padding: 5px 11px;
-  border-radius: 7px;
+  border-radius: var(--radius-sm);
   background: var(--bg-subtle);
   border: 1px solid var(--border-strong);
   transition: all 120ms ease;
@@ -773,7 +764,7 @@ h1, h2, h3, h4, p {
 }
 
 /* ==============================================================================
-   Volet Réponse : Synthèse Juridique Haute Fidélité
+   Volet Réponse
    ============================================================================== */
 .ans-label {
   font-size: 11.5px;
@@ -788,7 +779,7 @@ h1, h2, h3, h4, p {
   background: var(--bg-elevated);
   border: 1px solid var(--border-subtle);
   border-left: 4px solid var(--accent-primary);
-  border-radius: 12px;
+  border-radius: var(--radius-md);
   padding: 18px 22px;
   font-size: 1.04rem;
   line-height: 1.75;
@@ -825,7 +816,7 @@ h1, h2, h3, h4, p {
   padding: 10px 14px;
   background: var(--bg-subtle);
   border: 1px solid var(--border-subtle);
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   font-size: 12.5px;
   color: var(--text-secondary);
 }
@@ -834,7 +825,7 @@ h1, h2, h3, h4, p {
 .callout {
   margin: 12px 0;
   padding: 14px 18px;
-  border-radius: 10px;
+  border-radius: var(--radius-md);
   border: 1px solid;
   font-size: 13px;
   line-height: 1.55;
@@ -879,7 +870,7 @@ h1, h2, h3, h4, p {
   margin-top: 14px;
   background: var(--bg-subtle);
   border: 1px solid var(--border-strong);
-  border-radius: 10px;
+  border-radius: var(--radius-md);
   padding: 14px 18px;
   font-size: 12.5px;
 }
@@ -946,7 +937,7 @@ h1, h2, h3, h4, p {
 }
 
 /* ==============================================================================
-   Capsule de Commande Flottante Centrée (Style Claude / Perplexity Pro)
+   Zone de saisie
    ============================================================================== */
 .composer {
   max-width: 920px;
@@ -959,7 +950,7 @@ h1, h2, h3, h4, p {
   padding: 12px 16px 10px;
   background: var(--bg-elevated);
   border: 1px solid var(--border-strong);
-  border-radius: 16px;
+  border-radius: var(--radius-lg);
   box-shadow: var(--shadow-composer);
   transition: border-color 150ms ease, box-shadow 150ms ease;
 }
@@ -1001,7 +992,7 @@ h1, h2, h3, h4, p {
   font-weight: 500;
   line-height: 1.35;
   padding: 6px 12px;
-  border-radius: 10px;
+  border-radius: var(--radius-md);
   border: 1px solid var(--border-subtle);
   background: var(--bg-subtle);
   color: var(--text-secondary);
@@ -1030,7 +1021,6 @@ h1, h2, h3, h4, p {
   border-color: var(--accent-primary);
   color: var(--accent-primary);
   background: var(--accent-subtle);
-  transform: translateY(-1px);
 }
 
 .chip:active:not(:disabled) {
@@ -1119,7 +1109,7 @@ h1, h2, h3, h4, p {
 }
 
 /* ==============================================================================
-   Pied de Page (Colophon Discret)
+   Pied de page
    ============================================================================== */
 .footer {
   display: flex;
@@ -1139,7 +1129,7 @@ h1, h2, h3, h4, p {
 }
 
 /* ==============================================================================
-   Panneau Latéral « À propos » (Drawer)
+   Panneau « À propos »
    ============================================================================== */
 .drawer {
   position: fixed;
@@ -1196,7 +1186,7 @@ h1, h2, h3, h4, p {
 }
 
 /* ==============================================================================
-   Impression (Print Rules)
+   Impression
    ============================================================================== */
 @media print {
   body {
@@ -1219,7 +1209,7 @@ h1, h2, h3, h4, p {
 }
 
 /* ==============================================================================
-   Règles Responsive (Écrans Étroits et Mobiles)
+   Écrans étroits
    ============================================================================== */
 @media (max-width: 1000px) {
   .layout {
