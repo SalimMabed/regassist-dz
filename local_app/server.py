@@ -8,6 +8,7 @@ Conséquences de sécurité :
 """
 import collections
 import os
+import re
 import socket
 import threading
 import time
@@ -18,13 +19,15 @@ from werkzeug.serving import ThreadedWSGIServer
 
 from . import config as C
 from . import lan as L
-from .service import Service, ServiceError, check_environment, setup_logging
+from . import smalltalk, waitqueue
+from .service import Service, ServiceError, check_environment, setup_logging, validate_payload
 
 CSP = ("default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src 'self'; font-src 'self'; "
        "base-uri 'none'; form-action 'none'; frame-ancestors 'none'")
 _PAGES = {"": "index.html", "index.html": "index.html", "app.css": "app.css", "app.js": "app.js", "favicon.svg": "favicon.svg", "login.css": "login.css"}
 # Mode réseau seulement : ce qui reste accessible sans code d'accès (la page d'accès et ses ressources, la sonde de vie qui ne renvoie que « ok »).
 _PUBLIC_IN_LAN = {"/login", "/login.css", "/favicon.svg", "/favicon.ico", "/api/health"}
+_TICKET = re.compile(r"[A-Za-z0-9_-]{16,64}")
 
 
 class RateLimiter:
@@ -114,8 +117,9 @@ def extract_client_ip(req, mode: str) -> str:
 
 def create_app(service: Service, port: int | None = None, lan: "L.LanAccess | None" = None,
                deploy_mode: str | None = None, allowed_hosts: str | None = None,
-               allowed_origins: str | None = None, rate_limiter: RateLimiter | None = None) -> Flask:
-    """`lan` = None (défaut) : application locale, 127.0.0.1 seulement. `lan` fourni : accès réseau avec code d'accès (voir lan.py)."""
+               allowed_origins: str | None = None, rate_limiter: RateLimiter | None = None, wait_queue: "waitqueue.WaitQueue | None" = None) -> Flask:
+    """`lan` = None (défaut) : application locale, 127.0.0.1 seulement. `lan` fourni : accès réseau avec code d'accès (voir lan.py).
+    `wait_queue` : file d'attente des questions (voir waitqueue.py) ; sinon construite d'après REGASSIST_QUEUE_MAX (active par défaut en production seulement)."""
     port = port or C.port()
     mode = (deploy_mode or os.environ.get("REGASSIST_DEPLOY_MODE", "local")).strip().lower()
     if mode == "production":
@@ -139,6 +143,7 @@ def create_app(service: Service, port: int | None = None, lan: "L.LanAccess | No
     )
     app.rate_limiter = limiter
     app.deploy_mode = mode
+    app.wait_queue = wait_queue if wait_queue is not None else waitqueue.from_env(service.chat, mode, log=service.log)
 
     def err(http: int, code: str, message: str):
         r = jsonify({"error": {"code": code, "message": message}})
@@ -233,7 +238,9 @@ def create_app(service: Service, port: int | None = None, lan: "L.LanAccess | No
 
     @app.get("/api/status")
     def status():
-        return jsonify(service.status())
+        out = service.status()
+        out["queue"] = app.wait_queue.snapshot() if app.wait_queue is not None else {"enabled": False}
+        return jsonify(out)
 
     @app.post("/api/chat")
     def chat():
@@ -250,6 +257,42 @@ def create_app(service: Service, port: int | None = None, lan: "L.LanAccess | No
         if data is None:
             return err(400, "invalid_json", "Le corps de la requête n'est pas un JSON valide.")
         return jsonify(service.chat(data))
+
+    # ----- file d'attente (déploiement public ; voir waitqueue.py) -----
+    @app.post("/api/queue")
+    def queue_submit():
+        if app.wait_queue is None:
+            return err(404, "not_found", "Ressource introuvable.")
+        client_ip = extract_client_ip(request, mode)
+        allowed, retry_after = app.rate_limiter.is_allowed(client_ip)
+        if not allowed:
+            resp = err(429, "rate_limited", f"Trop de requêtes. Veuillez patienter {retry_after} seconde(s).")
+            resp.headers["Retry-After"] = str(retry_after)
+            return resp
+        if request.mimetype != "application/json":
+            return err(415, "unsupported_media_type", "Type de contenu non pris en charge : JSON attendu.")
+        data = request.get_json(silent=True)
+        if data is None:
+            return err(400, "invalid_json", "Le corps de la requête n'est pas un JSON valide.")
+        q = validate_payload(data)                                                   # refus immédiat d'une question invalide : elle n'entre jamais dans la file
+        if smalltalk.classify(q) is not None:                                        # salutation : réponse immédiate, sans attendre derrière les vraies questions
+            return jsonify({"ticket": None, "state": "done", "ahead": 0, "position": 0, "waiting": app.wait_queue.snapshot()["waiting"], "eta_s": 0,
+                            "result": service.chat(data), "error": None})
+        if service.warming():
+            raise ServiceError(503, "warming_up", "Le service démarre. Réessayez dans quelques secondes.")
+        return jsonify(app.wait_queue.submit(data, client_ip)), 202
+
+    @app.get("/api/queue/<ticket>")
+    def queue_view(ticket):
+        view = app.wait_queue.view(ticket) if app.wait_queue is not None and _TICKET.fullmatch(ticket) else None
+        if view is None:
+            return err(404, "ticket_unknown", "Cette question n'est plus dans la file (délai dépassé ou annulation). Posez-la de nouveau.")
+        return jsonify(view)
+
+    @app.post("/api/queue/<ticket>/cancel")
+    def queue_cancel(ticket):
+        ok = app.wait_queue is not None and bool(_TICKET.fullmatch(ticket)) and app.wait_queue.cancel(ticket)
+        return jsonify({"cancelled": ok})
 
     @app.get("/favicon.ico")
     def favicon_ico():

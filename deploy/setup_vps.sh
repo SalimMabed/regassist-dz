@@ -4,24 +4,28 @@
 # ==============================================================================
 # Runs steps 1 to 7 of README_DEPLOY.md: packages, service user, data and models,
 # Python environment, systemd services, firewall, Let's Encrypt certificate,
-# nginx with HTTP Basic authentication, then checks and one real question.
+# nginx, then checks and one real question through the waiting queue.
 #
 # Usage, as root, from the clone that MUST live in /opt/regassist-dz:
 #   apt-get update && apt-get install -y git
 #   git clone https://github.com/SalimMabed/regassist-dz.git /opt/regassist-dz
-#   bash /opt/regassist-dz/deploy/setup_vps.sh regassist.example.org
+#   bash /opt/regassist-dz/deploy/setup_vps.sh regassist.example.org [--private]
+#
+# Access: public by default (anyone with the link; one question is processed at a time and the
+# others wait in the queue). With --private, nginx asks for HTTP Basic authentication: the
+# password is generated once and written to /root/regassist-access.txt (mode 600); never paste
+# it in a chat or an issue.
 #
 # Prerequisite: a DNS A record for the given name already points to this server.
 # certbot asks for an e-mail address and the Let's Encrypt terms: answer it yourself.
 # The script can be re-run after a failure: finished steps are detected and skipped.
-# The access password is written once to /root/regassist-access.txt (mode 600):
-# never paste it in a chat or an issue.
 # ==============================================================================
 
 set -Eeuo pipefail
 trap 'echo "ECHEC : ligne ${LINENO}. Corrigez la cause puis relancez la meme commande (les etapes terminees sont ignorees)." >&2' ERR
 
-DOMAIN="${1:-}"
+DOMAIN=""
+PRIVATE=0
 ACCESS_USER="${ACCESS_USER:-judge}"
 REPO="/opt/regassist-dz"
 DATA="/opt/regassist-data"
@@ -36,10 +40,18 @@ step() { printf '\n== [%s] %s\n' "$1" "$2"; }
 warn() { printf 'ATTENTION : %s\n' "$*" >&2; }
 die()  { printf 'ERREUR : %s\n' "$*" >&2; trap - ERR; exit 1; }
 
+for arg in "$@"; do
+    case "${arg}" in
+        --private) PRIVATE=1 ;;
+        -*) die "option inconnue : ${arg} (seule --private existe)." ;;
+        *) DOMAIN="${arg}" ;;
+    esac
+done
+
 # ---- 0. Preconditions -------------------------------------------------------
 step 0 "Controles prealables"
 [[ $EUID -eq 0 ]] || die "a lancer en root (sudo -i)."
-[[ -n "${DOMAIN}" ]] || die "usage : bash deploy/setup_vps.sh <nom-de-domaine>"
+[[ -n "${DOMAIN}" ]] || die "usage : bash deploy/setup_vps.sh <nom-de-domaine> [--private]"
 [[ "${DOMAIN}" =~ ^([a-z0-9]([a-z0-9-]*[a-z0-9])?\.)+[a-z]{2,}$ ]] || die "nom de domaine invalide : '${DOMAIN}'."
 [[ "${REPO_ROOT}" == "${REPO}" ]] || die "le depot doit etre clone dans ${REPO} (les unites systemd utilisent ce chemin) ; il est dans ${REPO_ROOT}."
 
@@ -116,7 +128,7 @@ wait_http "http://127.0.0.1:8790/api/health" 300 || { journalctl -u regassist-we
 echo "OK : LLM et application repondent en local."
 
 # ---- 5. Firewall, certificate, private access, nginx -------------------------
-step 5 "Pare-feu, certificat Let's Encrypt, acces prive, nginx"
+step 5 "Pare-feu, certificat Let's Encrypt, nginx"
 SSH_PORT="$(sshd -T 2>/dev/null | awk '/^port / {print $2; exit}')"
 SSH_PORT="${SSH_PORT:-22}"
 ufw allow "${SSH_PORT}/tcp" >/dev/null
@@ -135,7 +147,7 @@ if [[ ! -d "/etc/letsencrypt/live/${DOMAIN}" ]]; then
 fi
 
 NEW_PASS=0
-if [[ ! -s "${HTPASSWD}" ]]; then
+if (( PRIVATE )) && [[ ! -s "${HTPASSWD}" ]]; then
     PASS="$(openssl rand -base64 24 | tr -d '/+=' | cut -c1-24)"
     printf '%s:%s\n' "${ACCESS_USER}" "$(printf '%s' "${PASS}" | openssl passwd -apr1 -stdin)" > "${HTPASSWD}"
     chown root:www-data "${HTPASSWD}"
@@ -145,32 +157,53 @@ if [[ ! -s "${HTPASSWD}" ]]; then
 fi
 
 sed "s/YOUR_DOMAIN\.COM/${DOMAIN}/g" "${REPO}/deploy/nginx-regassist.conf" > /etc/nginx/sites-available/regassist
+if (( PRIVATE )); then sed -i 's/^    #auth_basic/    auth_basic/' /etc/nginx/sites-available/regassist; fi
 ln -sf /etc/nginx/sites-available/regassist /etc/nginx/sites-enabled/regassist
 nginx -t
 systemctl enable nginx
 systemctl start nginx
 
-# ---- 6. Checks and one real question -----------------------------------------
+# ---- 6. Checks and one real question through the waiting queue --------------
 step 6 "Verifications"
 code_http="$(curl -s -o /dev/null -w '%{http_code}' --max-time 15 "http://${DOMAIN}/" || true)"
 code_noauth="$(curl -s -o /dev/null -w '%{http_code}' --max-time 15 "https://${DOMAIN}/api/health" || true)"
-code_auth="n/a"; smoke="non execute (mot de passe absent de ${CRED_FILE})"
-if [[ -r "${CRED_FILE}" ]]; then
+code_auth="n/a"; auth_env=""
+if (( PRIVATE )) && [[ -r "${CRED_FILE}" ]]; then
     PASS="$(awk -F' : ' '/^mot de passe/ {print $2}' "${CRED_FILE}")"
     ACCESS_USER="$(awk -F' : ' '/^identifiant/ {print $2}' "${CRED_FILE}")"
-    auth_cfg() { printf 'user = "%s:%s"\n' "${ACCESS_USER}" "${PASS}"; }
-    code_auth="$(auth_cfg | curl -s -K - -o /dev/null -w '%{http_code}' --max-time 15 "https://${DOMAIN}/api/health" || true)"
-    t0="$(date +%s)"
-    smoke="$(auth_cfg | curl -s -K - --max-time 290 -H 'Content-Type: application/json' \
-        -d '{"question":"Quel est le plafond d'"'"'indemnisation par déposant ?"}' "https://${DOMAIN}/api/chat" 2>/dev/null \
-        | python3 -c 'import sys, json
-d = json.load(sys.stdin)
-print("status=%s sources=%d citations=%d generation_ms=%s" % (d.get("status"), len(d.get("sources", [])), len(d.get("citations", [])), d.get("durations_ms", {}).get("generation")))' 2>/dev/null || echo "echec")"
-    smoke="${smoke} duree_totale_s=$(( $(date +%s) - t0 ))"
+    auth_env="${ACCESS_USER}:${PASS}"
+    code_auth="$(printf 'user = "%s"\n' "${auth_env}" | curl -s -K - -o /dev/null -w '%{http_code}' --max-time 15 "https://${DOMAIN}/api/health" || true)"
 fi
+t0="$(date +%s)"
+smoke="$(RA_AUTH="${auth_env}" python3 - "https://${DOMAIN}" <<'PY' 2>&1
+import base64, json, os, sys, time, urllib.request
+base = sys.argv[1]
+hdr = {"Content-Type": "application/json"}
+if os.environ.get("RA_AUTH"):
+    hdr["Authorization"] = "Basic " + base64.b64encode(os.environ["RA_AUTH"].encode()).decode()
+def call(path, body=None):
+    req = urllib.request.Request(base + path, data=None if body is None else json.dumps(body).encode(), headers=hdr)
+    with urllib.request.urlopen(req, timeout=30) as r:
+        return json.load(r)
+q = call("/api/status").get("queue", {})
+t0 = time.time()
+v = call("/api/queue", {"question": "Quel est le plafond d'indemnisation par déposant ?"})
+while v["state"] in ("queued", "running") and time.time() - t0 < 290:
+    time.sleep(2)
+    v = call("/api/queue/" + v["ticket"])
+d = v.get("result") or {}
+print("file=%s etat=%s status=%s sources=%d citations=%d generation_ms=%s" % ("active" if q.get("enabled") else "ABSENTE", v["state"], d.get("status"), len(d.get("sources", [])), len(d.get("citations", [])), d.get("durations_ms", {}).get("generation")))
+PY
+)" || smoke="echec"
+smoke="${smoke} duree_totale_s=$(( $(date +%s) - t0 ))"
 
 cpu_model="$(awk -F': ' '/model name/ {print $2; exit}' /proc/cpuinfo)"
 root_rota="$(lsblk -dno ROTA "$(df --output=source / | tail -n 1)" 2>/dev/null || echo '?')"
+if (( PRIVATE )); then
+    mode_txt="prive (mot de passe nginx)"; expect_noauth="401"
+else
+    mode_txt="public (sans mot de passe), file d'attente"; expect_noauth="200"
+fi
 cat <<EOF
 
 ================ RESULTAT (sans secret : vous pouvez le coller dans le chat) ================
@@ -179,15 +212,21 @@ processeur           : ${cpu_model} ($(nproc) coeurs, AVX2 ${has_avx2})
 memoire              : $((mem_kb / 1024)) Mo
 disque racine        : ${avail_gb} Go libres au depart, rotatif=${root_rota} (0 = SSD)
 domaine              : ${DOMAIN} -> ${resolved}
+acces                : ${mode_txt}
 HTTP -> HTTPS        : ${code_http} (attendu 301)
-HTTPS sans mot de passe : ${code_noauth} (attendu 401)
-HTTPS avec mot de passe : ${code_auth} (attendu 200)
+HTTPS sans mot de passe : ${code_noauth} (attendu ${expect_noauth})
+HTTPS avec mot de passe : ${code_auth} (attendu 200 si prive, n/a sinon)
 question reelle      : ${smoke}
 =============================================================================================
 EOF
-if (( NEW_PASS )); then
-    echo "Identifiants d'acces crees. Pour les lire (ne les collez jamais dans un chat) : cat ${CRED_FILE}"
+if (( PRIVATE )); then
+    if (( NEW_PASS )); then
+        echo "Identifiants d'acces crees. Pour les lire (ne les collez jamais dans un chat) : cat ${CRED_FILE}"
+    else
+        echo "Identifiants d'acces deja existants : ${CRED_FILE} (supprimez ${HTPASSWD} puis relancez pour en generer de nouveaux)."
+    fi
+    echo "Ce service expose un assistant juridique NON valide (NO-GO provisoire) : ne diffusez l'acces qu'aux evaluateurs."
 else
-    echo "Identifiants d'acces deja existants : ${CRED_FILE} (supprimez ${HTPASSWD} puis relancez pour en generer de nouveaux)."
+    echo "Adresse publique : https://${DOMAIN}/ - une seule question est traitee a la fois, les autres attendent dans la file."
+    echo "Ce service expose un assistant juridique NON valide (NO-GO provisoire) : le bandeau de l'interface le rappelle."
 fi
-echo "Ce service expose un assistant juridique NON valide (NO-GO provisoire) : ne diffusez l'acces qu'aux evaluateurs."

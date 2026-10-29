@@ -9,6 +9,8 @@
   const MAX_ENTRIES = 150;
   const POLL_MS = 20000;
   const TIMEOUT_MS = 270000; // 270 s : marge supérieure aux 240 s d'amont (Nginx proxy_read_timeout et Gunicorn --timeout)
+  const QUEUE_POLL_MS = 2000;
+  const QUEUE_MAX_WAIT_MS = 45 * 60 * 1000;
   const DEFAULT_MAX_Q = 500;
   const UNAVAILABLE = 'Le service de rédaction des réponses est momentanément indisponible.';
 
@@ -111,7 +113,7 @@
   /* ---------- rendu ---------- */
   function resetWorkspace() {
     if (state.timer) { clearInterval(state.timer); state.timer = null; }
-    $('question-echo').hidden = true;
+    $('question-echo').hidden = true; $('answer').removeAttribute('aria-busy');
     $('sources').replaceChildren(el('p', 'placeholder', 'Les textes officiels retrouvés apparaîtront ici, avec leurs extraits.'));
     $('answer').replaceChildren(el('p', 'placeholder', 'Posez une question en bas de page. La réponse n\'est affichée qu\'accompagnée de ses sources.'));
   }
@@ -330,16 +332,40 @@
     else if (!state.reachable) msg = 'Le service est momentanément injoignable. Réessayez dans un instant.';
     else if (starting()) msg = 'Le service démarre, veuillez patienter quelques secondes…';
     else if (state.status && state.status.llm && !state.status.llm.online) msg = UNAVAILABLE + ' Les textes pertinents seront affichés sans réponse rédigée.';
+    else if (queueOn() && !state.busy && (state.status.queue.running || state.status.queue.waiting)) {
+      const n = state.status.queue.waiting + (state.status.queue.running ? 1 : 0);
+      msg = n === 1 ? 'Une question est en cours de traitement : la vôtre passera juste après.' : n + ' questions sont dans la file : la vôtre passera à son tour.';
+    }
     $('composer-msg').textContent = msg;
     const disabled = state.busy || !state.reachable || starting();
     $('btn-send').disabled = disabled || n < 3 || q.length > state.maxQ;
     document.querySelectorAll('.chip').forEach((b) => { b.disabled = disabled; });
   }
 
+  function commitAnswer(q, data) {
+    if (!state.conv) { state.conv = { id: uid(), at: Date.now(), entries: [] }; state.convs.push(state.conv); }
+    const entry = { id: uid(), at: Date.now(), q: data.question || q, r: data };
+    state.conv.entries.push(entry); state.entry = entry.id;
+    saveHistory(); renderHistory(); renderResponse(data);
+    $('question').value = '';
+  }
+
   async function sendQuestion() {
     const q = $('question').value.trim();
     if (state.busy || q.length < 3 || q.length > state.maxQ) return;
-    state.busy = true; updateComposer(); showQuestion(q); renderLoading();
+    state.busy = true; updateComposer(); showQuestion(q);
+    try {
+      const data = queueOn() ? await askQueued(q) : await askDirect(q);
+      if (data) commitAnswer(q, data);
+    } finally {
+      if (state.timer) { clearInterval(state.timer); state.timer = null; }
+      state.busy = false; refreshStatus(); updateComposer();
+    }
+  }
+
+  /* Requête unique : la réponse revient sur la même connexion (application locale ; déploiement sans file d'attente). Renvoie la réponse, ou null après avoir affiché l'erreur. */
+  async function askDirect(q) {
+    renderLoading();
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), TIMEOUT_MS);
     try {
@@ -349,7 +375,7 @@
         body: JSON.stringify({ question: q }),
         signal: controller.signal
       });
-      if (res.status === 401) { location.assign('/login'); return; }          // mode réseau : session expirée → page du code d'accès
+      if (res.status === 401) { location.assign('/login'); return null; }          // mode réseau : session expirée → page du code d'accès
       let data = null; try { data = await res.json(); } catch (e) { data = null; }
       if (!res.ok || !data || data.error) {
         if (res.status === 429) {
@@ -358,23 +384,92 @@
         } else {
           renderError((data && data.error && data.error.message) || 'Le service a répondu par une erreur (' + res.status + ').');
         }
-      } else {
-        if (!state.conv) { state.conv = { id: uid(), at: Date.now(), entries: [] }; state.convs.push(state.conv); }
-        const entry = { id: uid(), at: Date.now(), q: data.question || q, r: data };
-        state.conv.entries.push(entry); state.entry = entry.id;
-        saveHistory(); renderHistory(); renderResponse(data);
-        $('question').value = '';
+        return null;
       }
+      return data;
     } catch (e) {
       if (e.name === 'AbortError') {
         renderError('Le délai de traitement a expiré (dépassement de 270 secondes). Le serveur est peut-être surchargé.');
       } else {
         renderError('Le service est momentanément injoignable. Réessayez dans un instant.');
       }
+      return null;
     } finally {
       clearTimeout(timeoutId);
-      if (state.timer) { clearInterval(state.timer); state.timer = null; }
-      state.busy = false; refreshStatus(); updateComposer();
+    }
+  }
+
+  /* ---------- file d'attente (déploiement public) : un ticket, puis l'état est relevé toutes les quelques secondes ---------- */
+  const queueOn = () => !!(state.status && state.status.queue && state.status.queue.enabled);
+  const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+  const fmtEta = (s) => (s < 45 ? "moins d'une minute" : s < 90 ? 'environ 1 minute' : 'environ ' + Math.round(s / 60) + ' minutes');
+
+  // Fiche « file d'attente » : construite une fois, puis seuls ses textes sont mis à jour (le bouton reste cliquable).
+  function renderQueueCard() {
+    const box = $('answer'); box.replaceChildren(); box.setAttribute('aria-busy', 'true');
+    const card = el('div', 'queue-card'); card.setAttribute('role', 'status');
+    const head = el('div', 'queue-head', 'Votre question est en file d\'attente');
+    const pos = el('div', 'queue-pos'); const ahead = el('div', 'queue-line'); const eta = el('div', 'queue-line');
+    const hint = el('p', 'queue-hint', 'Une seule question est traitée à la fois. Gardez cette page ouverte : votre question démarrera automatiquement.');
+    const leave = el('button', 'btn btn-ghost queue-leave','Quitter la file d\'attente'); leave.type = 'button';
+    leave.addEventListener('click', cancelQueued);
+    card.append(head, pos, ahead, eta, hint, leave); box.append(card);
+    $('sources').replaceChildren(el('p', 'placeholder', 'Les sources s\'afficheront avec la réponse.'));
+    state.qui = { card, head, pos, ahead, eta };
+  }
+
+  function updateQueueCard(v) {
+    if (!state.qui) renderQueueCard();
+    const u = state.qui;
+    u.pos.textContent = 'N° ' + v.position + ' dans la file';
+    u.ahead.textContent = v.ahead === 1 ? '1 question avant la vôtre' : v.ahead + ' questions avant la vôtre';
+    u.eta.textContent = 'Attente estimée : ' + fmtEta(v.eta_s);
+  }
+
+  async function cancelQueued() {
+    const t = state.ticket; state.cancelled = true;
+    if (t) { try { await fetch('/api/queue/' + encodeURIComponent(t) + '/cancel', { method: 'POST' }); } catch (e) { /* le ticket expirera de lui-même */ } }
+  }
+
+  async function queueCall(suffix, init) {          // suffix : '' (dépôt) ou '/<ticket>' (état)
+    const res = await fetch('/api/queue' + suffix, init);
+    if (res.status === 401) { location.assign('/login'); return { res, data: null }; }
+    let data = null; try { data = await res.json(); } catch (e) { data = null; }
+    return { res, data };
+  }
+
+  async function askQueued(q) {
+    state.cancelled = false; state.ticket = null; state.qui = null;
+    const t0 = Date.now(); let fails = 0; let first = true;
+    renderLoading();
+    try {
+      let v = null;
+      while (true) {
+        let r;
+        try {
+          r = first
+            ? await queueCall('', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ question: q }) })
+            : await queueCall('/' + encodeURIComponent(v.ticket), { cache: 'no-store' });
+        } catch (e) {
+          if (first || ++fails >= 8) { renderError('Le service est momentanément injoignable. Réessayez dans un instant.'); return null; }
+          await sleep(QUEUE_POLL_MS); continue;
+        }
+        if (!r.data) { if (r.res.status === 401) return null; renderError('Le service a répondu par une erreur (' + r.res.status + ').'); return null; }
+        fails = 0;
+        if (r.data.error && !r.data.state) { renderError(r.res.status === 404 && !first ? 'Votre place dans la file a expiré. Posez de nouveau votre question.' : r.data.error.message); return null; }
+        v = r.data; first = false;
+        if (v.state === 'done') return v.result;
+        if (v.state === 'error') { renderError((v.error && v.error.message) || 'La question n\'a pas pu être traitée.'); return null; }
+        state.ticket = v.ticket;
+        if (state.cancelled) { resetWorkspace(); return null; }
+        if (v.state === 'queued') updateQueueCard(v);
+        else if (state.qui) { state.qui = null; renderLoading(); }          // c'est son tour : retour à l'affichage « traitement en cours »
+        if (Date.now() - t0 > QUEUE_MAX_WAIT_MS) { renderError('L\'attente a dépassé 45 minutes. Réessayez plus tard.'); return null; }
+        await sleep(QUEUE_POLL_MS);
+        if (state.cancelled) { resetWorkspace(); return null; }
+      }
+    } finally {
+      state.ticket = null; state.qui = null;
     }
   }
 
@@ -423,6 +518,9 @@
     document.addEventListener('keydown', (ev) => { if (ev.key === 'Escape' && !$('about-panel').hidden) toggleAbout(false); });
     refreshStatus(); setInterval(() => { if (!document.hidden && !state.busy) refreshStatus(); }, POLL_MS);
     window.addEventListener('focus', refreshStatus);
+    window.addEventListener('pagehide', () => {          // page fermée : on libère sa place dans la file
+      if (state.ticket) fetch('/api/queue/' + encodeURIComponent(state.ticket) + '/cancel', { method: 'POST', keepalive: true }).catch(() => {});
+    });
     $('question').focus();
   }
   init();

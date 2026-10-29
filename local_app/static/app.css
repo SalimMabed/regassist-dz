@@ -902,6 +902,44 @@ h1, h2, h3, h4, p {
   color: var(--accent-primary);
 }
 
+/* File d'attente : position, questions devant la sienne, attente estimée */
+.queue-card {
+  margin-top: 8px;
+  padding: 16px 18px;
+  background: var(--bg-subtle);
+  border: 1px solid var(--border-subtle);
+  border-left: 3px solid var(--accent-primary);
+  border-radius: var(--radius-md);
+}
+
+.queue-head {
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: .05em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+.queue-pos {
+  margin: 6px 0 4px;
+  font-size: 24px;
+  font-weight: 700;
+  line-height: 1.2;
+  color: var(--accent-hover);
+}
+
+.queue-line {
+  font-size: 13.5px;
+  color: var(--text-secondary);
+}
+
+.queue-hint {
+  margin: 12px 0;
+  font-size: 12.5px;
+  line-height: 1.5;
+  color: var(--text-muted);
+}
+
 /* Textes proposés sans réponse directe */
 .texts {
   list-style: none;

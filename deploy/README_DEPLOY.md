@@ -29,7 +29,13 @@ This directory contains the production-hardened deployment configuration for Reg
 
 ## Access Control
 
-Gunicorn has **no access gate** in this deployment: the access code of the Windows LAN mode lives in `local_app/lan.py` and is not wired into `deploy/wsgi.py`. The nginx configuration therefore requires **HTTP Basic authentication on the whole site** (step 6). Share the password only with the intended evaluators: the service exposes an unvalidated legal assistant (status NO-GO PROVISOIRE) and must not be open to the general public.
+The service is **public by default**: anyone with the link can use it, without a password. Gunicorn has no access gate (the access code of the Windows LAN mode lives in `local_app/lan.py` and is not wired into `deploy/wsgi.py`), so the protections against abuse are these:
+
+- **Waiting queue** (`local_app/waitqueue.py`, enabled by default in production, `REGASSIST_QUEUE_MAX`, default 8). The model handles one question at a time (about 150 s on the VPS CPU), so the page submits the question (`POST /api/queue`, answered at once with a ticket) and then polls the ticket (`GET /api/queue/<ticket>`) every 2 s, showing the visitor's position and an estimated wait. No HTTP request stays open while waiting. At most 8 questions (running + waiting) and 2 per client IP (`REGASSIST_QUEUE_PER_IP`); a waiting ticket that is no longer polled for 2 minutes (page closed) is dropped; a question already running always finishes. Greetings are answered immediately without waiting. `REGASSIST_QUEUE_MAX=0` restores the old behaviour (HTTP 429 `busy`).
+- **Rate limits** in nginx (`/api/chat` and the queue submissions: 10 requests/min per IP; status polling: 300/min per IP) and in the application (10 submissions/min per IP, behind the trusted proxy address).
+- Host and Origin checks, TLS only, unknown host names dropped, `fail2ban` for SSH.
+
+The service exposes an unvalidated legal assistant (status NO-GO PROVISOIRE; the interface says so on every page). To restrict it to a few evaluators instead, use **`--private`**: nginx then requires HTTP Basic authentication on the whole site (see `setup_vps.sh` and `update_vps.sh` below).
 
 ---
 
@@ -39,7 +45,8 @@ Gunicorn has **no access gate** in this deployment: the access code of the Windo
 - `linux_env.sh`: Non-intrusive Linux path mapping and environment setup.
 - `start_llm_linux.sh`: Script to launch `llama-server` (b11411 build) with matching arguments on Linux.
 - `wsgi.py`: Gunicorn WSGI entry point ensuring single `Service` instance and thread safety.
-- `nginx-regassist.conf`: Hardened reverse proxy configuration with catch-all TLS dropping.
+- `nginx-regassist.conf`: Hardened reverse proxy configuration with catch-all TLS dropping, rate limits and the waiting-queue location.
+- `setup_vps.sh` / `update_vps.sh`: one-command installation of a fresh server / update of a running one (see below).
 - `systemd/`: Service supervision unit files (`regassist-llm.service`, `regassist-web.service`).
 - `regassist.env`: Environment file containing production secrets and path configurations.
 - `test_proxy_security.sh`: 3-case automated test script for host/origin security and header spoofing defenses.
@@ -55,9 +62,19 @@ On a fresh Ubuntu 24.04 server whose DNS name already points to it, as root:
 apt-get update && apt-get install -y git certbot
 certbot register --agree-tos --register-unsafely-without-email --no-eff-email   # or give an e-mail address instead
 git clone https://github.com/SalimMabed/regassist-dz.git /opt/regassist-dz
-bash /opt/regassist-dz/deploy/setup_vps.sh regassist.example.org
+bash /opt/regassist-dz/deploy/setup_vps.sh regassist.example.org            # public access with the waiting queue
+# bash /opt/regassist-dz/deploy/setup_vps.sh regassist.example.org --private  # or: password-protected (login written to /root/regassist-access.txt)
 ```
-The script runs steps 1 to 7 below (it refuses to start when memory, disk or DNS are insufficient), prints a result block without secrets and writes the Basic-auth login to `/root/regassist-access.txt` (mode 600). It can be re-run after a failure. Without the `certbot register` line above, certbot asks for an e-mail address and the Let's Encrypt terms interactively.
+The script runs steps 1 to 7 below (it refuses to start when memory, disk or DNS are insufficient) and prints a result block without secrets, including one real question sent through the queue. With `--private` it also generates the Basic-auth login and writes it to `/root/regassist-access.txt` (mode 600). It can be re-run after a failure. Without the `certbot register` line above, certbot asks for an e-mail address and the Let's Encrypt terms interactively.
+
+### Updating a running server: `update_vps.sh`
+
+After new commits on `main`, as root on the server (no download, the language model is not reloaded, about two minutes including the application warm-up):
+```bash
+cd /opt/regassist-dz && git -c safe.directory=/opt/regassist-dz pull --ff-only
+bash /opt/regassist-dz/deploy/update_vps.sh --public      # or --private; without an option the current mode is kept
+```
+The first command is only needed when `update_vps.sh` itself is not on the server yet. The script pulls the repository, refreshes the Python environment only when its requirements changed, restarts `regassist-web`, regenerates the nginx site from the template (the old one is saved to `/root/nginx-regassist.conf.*.bak` and restored if `nginx -t` fails) and prints a result block.
 
 **First real run (2026-10-29).** Octenium VPS Ultimate: 4 vCPU, 8 GB RAM, 500 GB HDD (RAID 10), Intel Xeon E5-2690 v2 (Ivy Bridge: **AVX but no AVX2**), Ubuntu 24.04. Models and corpus were downloaded and verified in about one minute, the whole setup took about 15 minutes. Checks: HTTP 301, HTTPS 401 without password and 200 with it, valid Let's Encrypt certificate. One real question ("Quel est le plafond d'indemnisation par déposant ?") returned `answered` with 3 sources and 1 citation in **148 s** (generation 144.7 s). On a CPU without AVX2 the reranker and llama.cpp run, but slower, and ranks may differ slightly from an AVX2 machine (see `docs/OUTDATED_AMOUNTS_STUDY.md`).
 
@@ -190,13 +207,14 @@ sudo rm -f /etc/nginx/sites-enabled/default
 sudo systemctl stop nginx
 sudo certbot certonly --standalone -d "${DOMAIN}"
 
-# Private access: one user, a long random password (write it down, it is shown only here)
+# Optional private access (skip for the public service): one user, a long random password (write it down, it is shown only here)
 openssl rand -base64 18
 sudo htpasswd -c /etc/nginx/regassist.htpasswd judge      # prompts twice for that password
 sudo chown root:www-data /etc/nginx/regassist.htpasswd && sudo chmod 640 /etc/nginx/regassist.htpasswd
 
-# Site activation
-sudo cp deploy/nginx-regassist.conf /etc/nginx/sites-available/regassist
+# Site activation (replace YOUR_DOMAIN.COM; for private access also remove the leading '#' of the two auth_basic lines)
+sudo sed "s/YOUR_DOMAIN\.COM/${DOMAIN}/g" deploy/nginx-regassist.conf | sudo tee /etc/nginx/sites-available/regassist >/dev/null
+# sudo sed -i 's/^    #auth_basic/    auth_basic/' /etc/nginx/sites-available/regassist
 sudo ln -sf /etc/nginx/sites-available/regassist /etc/nginx/sites-enabled/regassist
 sudo nginx -t && sudo systemctl start nginx
 
@@ -211,9 +229,10 @@ curl -s http://127.0.0.1:8790/api/health
 # Verify readiness & provider status
 curl -s http://127.0.0.1:8790/api/status
 
-# Through nginx: 401 without the password, then {"status":"ok"} with it (prompts for the password)
+# Through nginx, public mode: 200 and {"status":"ok"}; private mode: 401 without the password, then 200 with it
 curl -s -o /dev/null -w "%{http_code}\n" "https://${DOMAIN}/api/health"
-curl -s -u judge "https://${DOMAIN}/api/health"
+curl -s "https://${DOMAIN}/api/status" | python3 -c 'import sys, json; d = json.load(sys.stdin); print(d["app"]["state"], d["queue"])'
+# private mode only: curl -s -u judge "https://${DOMAIN}/api/health"
 
 # Run automated proxy security & spoofing defenses test
 bash deploy/test_proxy_security.sh

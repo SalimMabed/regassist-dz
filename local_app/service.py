@@ -430,6 +430,9 @@ class Service:
             self._warm["duration_ms"] = round((time.perf_counter() - t0) * 1000)
             self.log("warmup", state=self._warm["state"], engine=self._warm["engine"], duration_ms=self._warm["duration_ms"])
 
+    def warming(self) -> bool:
+        return self._warm["state"] in ("pending", "running")
+
     def _engine(self) -> str:
         ag = self.agent
         return "legacy" if (ag.retriever_name() == "legacy" or getattr(ag, "_FALLBACK_REASON", None)) else ag.retriever_name().replace("auto", "hybrid_rerank")

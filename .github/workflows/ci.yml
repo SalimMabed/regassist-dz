@@ -49,6 +49,10 @@ jobs:
         run: |
           python local_app/tests/test_api.py
 
+      - name: Run Waiting Queue Tests
+        run: |
+          python local_app/tests/test_queue.py
+
       - name: Run Grounding Guard Tests
         run: |
           python local_app/tests/test_grounding.py
