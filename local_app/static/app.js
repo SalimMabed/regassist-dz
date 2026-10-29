@@ -10,7 +10,7 @@
   const POLL_MS = 20000;
   const TIMEOUT_MS = 270000; // 270 s : marge supérieure aux 240 s d'amont (Nginx proxy_read_timeout et Gunicorn --timeout)
   const QUEUE_POLL_MS = 2000;
-  const QUEUE_MAX_WAIT_MS = 45 * 60 * 1000;
+  const QUEUE_POLL_HIDDEN_MS = 10000;                  // onglet en arrière-plan : on ménage le serveur et la batterie
   const DEFAULT_MAX_Q = 500;
   const UNAVAILABLE = 'Le service de rédaction des réponses est momentanément indisponible.';
 
@@ -101,6 +101,7 @@
     state.conv = c; state.entry = en.id;
     showQuestion(en.q, 'Réponse enregistrée le ' + fmtWhen(en.at) + ' (historique de ce navigateur) : elle n\'est pas recalculée. Reposez la question pour obtenir une réponse à jour.');
     renderResponse(en.r);
+    const note = serverNote(en); if (note) $('answer').append(note);
     renderHistory();
   }
 
@@ -342,11 +343,14 @@
     document.querySelectorAll('.chip').forEach((b) => { b.disabled = disabled; });
   }
 
-  function commitAnswer(q, data) {
+  function commitAnswer(q, data, meta) {
     if (!state.conv) { state.conv = { id: uid(), at: Date.now(), entries: [] }; state.convs.push(state.conv); }
     const entry = { id: uid(), at: Date.now(), q: data.question || q, r: data };
+    if (meta && meta.ticket) { entry.ticket = meta.ticket; entry.exp = meta.exp; }
     state.conv.entries.push(entry); state.entry = entry.id;
     saveHistory(); renderHistory(); renderResponse(data);
+    if (meta && meta.viaLink) $('answer').prepend(el('p', 'ans-label', 'Réponse retrouvée avec votre lien personnel.'));
+    const note = serverNote(entry); if (note) $('answer').append(note);
     $('question').value = '';
   }
 
@@ -355,8 +359,8 @@
     if (state.busy || q.length < 3 || q.length > state.maxQ) return;
     state.busy = true; updateComposer(); showQuestion(q);
     try {
-      const data = queueOn() ? await askQueued(q) : await askDirect(q);
-      if (data) commitAnswer(q, data);
+      const out = queueOn() ? await askQueued(q) : { result: await askDirect(q) };
+      if (out && out.result) commitAnswer(q, out.result, out);
     } finally {
       if (state.timer) { clearInterval(state.timer); state.timer = null; }
       state.busy = false; refreshStatus(); updateComposer();
@@ -399,37 +403,25 @@
     }
   }
 
-  /* ---------- file d'attente (déploiement public) : un ticket, puis l'état est relevé toutes les quelques secondes ---------- */
+  /* ---------- suivi des questions : file d'attente, lien personnel, notification facultative ----------
+     Une question déposée reçoit un lien personnel ; la page en relève l'état toutes les quelques secondes. Avec la file persistante, la question est conservée
+     sur le serveur : on peut fermer la page et revenir (lien, ou notification). Sinon (file en mémoire), la page doit rester ouverte. */
   const queueOn = () => !!(state.status && state.status.queue && state.status.queue.enabled);
-  const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+  const persistent = () => queueOn() && !!state.status.queue.persistent;
+  const sleep = (ms) => new Promise((r) => { state.wake = r; setTimeout(r, ms); });                // le retour du réseau réveille l'attente
   const fmtEta = (s) => (s < 45 ? "moins d'une minute" : s < 90 ? 'environ 1 minute' : 'environ ' + Math.round(s / 60) + ' minutes');
-
-  // Fiche « file d'attente » : construite une fois, puis seuls ses textes sont mis à jour (le bouton reste cliquable).
-  function renderQueueCard() {
-    const box = $('answer'); box.replaceChildren(); box.setAttribute('aria-busy', 'true');
-    const card = el('div', 'queue-card'); card.setAttribute('role', 'status');
-    const head = el('div', 'queue-head', 'Votre question est en file d\'attente');
-    const pos = el('div', 'queue-pos'); const ahead = el('div', 'queue-line'); const eta = el('div', 'queue-line');
-    const hint = el('p', 'queue-hint', 'Une seule question est traitée à la fois. Gardez cette page ouverte : votre question démarrera automatiquement.');
-    const leave = el('button', 'btn btn-ghost queue-leave','Quitter la file d\'attente'); leave.type = 'button';
-    leave.addEventListener('click', cancelQueued);
-    card.append(head, pos, ahead, eta, hint, leave); box.append(card);
-    $('sources').replaceChildren(el('p', 'placeholder', 'Les sources s\'afficheront avec la réponse.'));
-    state.qui = { card, head, pos, ahead, eta };
-  }
-
-  function updateQueueCard(v) {
-    if (!state.qui) renderQueueCard();
-    const u = state.qui;
-    u.pos.textContent = 'N° ' + v.position + ' dans la file';
-    u.ahead.textContent = v.ahead === 1 ? '1 question avant la vôtre' : v.ahead + ' questions avant la vôtre';
-    u.eta.textContent = 'Attente estimée : ' + fmtEta(v.eta_s);
-  }
-
-  async function cancelQueued() {
-    const t = state.ticket; state.cancelled = true;
-    if (t) { try { await fetch('/api/queue/' + encodeURIComponent(t) + '/cancel', { method: 'POST' }); } catch (e) { /* le ticket expirera de lui-même */ } }
-  }
+  const fmtDur = (s) => (s < 60 ? s + ' s' : Math.floor(s / 60) + ' min ' + (s % 60) + ' s');
+  const days = () => { const d = (state.status && state.status.queue && state.status.queue.retention_days) || 7; return d === 1 ? '1 jour' : (Number.isInteger(d) ? d : Math.round(d * 10) / 10) + ' jours'; };
+  const ACTIVE_KEY = 'regassist.active.v1';
+  const TICKET_RE = /^[A-Za-z0-9_-]{16,64}$/;
+  const newKey = () => { const b = new Uint8Array(16); crypto.getRandomValues(b); return btoa(String.fromCharCode(...b)).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, ''); };
+  const loadActive = () => { try { const v = JSON.parse(localStorage.getItem(ACTIVE_KEY) || 'null'); return v && TICKET_RE.test(v.ticket) ? v : null; } catch (e) { return null; } };
+  const saveActive = (ticket, q, notified) => { try { localStorage.setItem(ACTIVE_KEY, JSON.stringify({ ticket, q, n: notified ? 1 : 0, at: Date.now() })); } catch (e) { /* stockage indisponible : le lien du suivi reste valable */ } };
+  const clearActive = () => { try { localStorage.removeItem(ACTIVE_KEY); } catch (e) { /* rien à effacer */ } };
+  const hashTicket = () => { const m = /^#q=([A-Za-z0-9_-]{16,64})$/.exec(location.hash); return m ? m[1] : null; };
+  const setHash = (t) => { try { history.replaceState(null, '', t ? '#q=' + t : location.pathname + location.search); } catch (e) { /* adresse non modifiable : sans conséquence */ } };
+  const trackUrl = (t) => location.origin + '/#q=' + t;
+  const STEPS = ['Question envoyée', 'En attente de traitement', 'En cours de traitement', 'Réponse disponible'];
 
   async function queueCall(suffix, init) {          // suffix : '' (dépôt) ou '/<ticket>' (état)
     const res = await fetch('/api/queue' + suffix, init);
@@ -438,39 +430,217 @@
     return { res, data };
   }
 
-  async function askQueued(q) {
-    state.cancelled = false; state.ticket = null; state.qui = null;
-    const t0 = Date.now(); let fails = 0; let first = true;
-    renderLoading();
+  /* --- notification : proposée après l'envoi, permission demandée seulement après un clic --- */
+  const pushSupported = () => 'serviceWorker' in navigator && 'PushManager' in window && 'Notification' in window;
+  const keyBytes = (b64) => { const s = atob(b64.replace(/-/g, '+').replace(/_/g, '/') + '==='.slice((b64.length + 3) % 4)); return Uint8Array.from(s, (c) => c.charCodeAt(0)); };
+
+  function buildNotify(ticket, notified) {
+    const wrap = el('div', 'track-notify'); const msg = el('p', 'track-note'); const btn = el('button', 'btn btn-ghost', 'Me prévenir quand la réponse est prête'); btn.type = 'button';
+    const push = state.status.queue.push || {};
+    const set = (text, withButton) => { msg.textContent = text; btn.hidden = !withButton; };
+    if (!push.enabled) set('Ce service n\'envoie pas de notification : gardez votre lien pour revenir lire la réponse.', false);
+    else if (!pushSupported()) set('Ce navigateur ne gère pas les notifications : gardez votre lien ou laissez cette page ouverte.', false);
+    else if (Notification.permission === 'denied') set('Les notifications sont bloquées pour ce site dans votre navigateur : gardez votre lien pour revenir lire la réponse.', false);
+    else if (notified) set('Notification activée pour cette question : elle ne sera envoyée qu\'une fois, à la fin du traitement.', false);
+    else set('Facultatif : votre navigateur vous demandera l\'autorisation d\'afficher une notification quand la réponse sera prête, même si ce site est fermé. Elle ne contiendra ni votre question ni la réponse. Si vous refusez, rien d\'autre ne change.', true);
+    btn.addEventListener('click', async () => {
+      btn.disabled = true;
+      try {
+        const perm = await Notification.requestPermission();
+        if (perm !== 'granted') { set('Notification non activée : gardez votre lien pour revenir lire la réponse.', false); return; }
+        const reg = await navigator.serviceWorker.register('/sw.js', { scope: '/' });
+        await navigator.serviceWorker.ready;
+        const sub = (await reg.pushManager.getSubscription()) || (await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: keyBytes(push.key) }));
+        const res = await fetch('/api/queue/' + encodeURIComponent(ticket) + '/push', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ subscription: sub.toJSON() }) });
+        if (res.status === 409) { set('La réponse est déjà prête : ouvrez le suivi pour la lire.', false); return; }
+        if (!res.ok) throw new Error('abonnement refusé');
+        saveActive(ticket, state.tr && state.tr.q, true);
+        set('Notification activée pour cette question : elle ne sera envoyée qu\'une fois, à la fin du traitement.', false);
+      } catch (e) {
+        set('L\'activation des notifications a échoué : gardez votre lien pour revenir lire la réponse.', false);
+      } finally { btn.disabled = false; }
+    });
+    wrap.append(msg, btn);
+    return wrap;
+  }
+
+  /* --- fiche de suivi : construite une fois, puis seuls ses textes changent (les boutons restent utilisables) --- */
+  function buildTrack(v, q) {
+    const box = $('answer'); box.replaceChildren(); box.setAttribute('aria-busy', 'true');
+    const card = el('div', 'track'); const live = el('p', 'sr-only'); live.setAttribute('role', 'status');
+    const steps = el('ol', 'track-steps'); const items = STEPS.map((t) => { const li = el('li', 'track-step'); li.append(el('span', 'track-dot'), el('span', 'track-label', t)); steps.append(li); return li; });
+    const detail = el('p', 'track-detail'); const net = el('p', 'track-net', 'Connexion interrompue : nouvelle tentative en cours. Votre question n\'est pas perdue.'); net.hidden = true;
+    card.append(live, steps, detail, net);
+    const tr = { card, live, items, detail, net, q, since: null, game: null, gameOpen: false, last: '' };
+    if (persistent()) {
+      card.append(el('p', 'track-note', 'Vous pouvez fermer cette page : votre question est conservée sur le serveur ' + days() + '. Gardez ce lien personnel pour la retrouver, sans le partager : il donne accès à votre question et à sa réponse.'));
+      const row = el('div', 'track-link'); const input = el('input'); input.type = 'text'; input.readOnly = true; input.value = trackUrl(v.ticket); input.setAttribute('aria-label', 'Lien personnel de suivi');
+      input.addEventListener('focus', () => input.select());
+      const copy = el('button', 'btn btn-ghost', 'Copier le lien'); copy.type = 'button';
+      copy.addEventListener('click', async () => { try { await navigator.clipboard.writeText(input.value); copy.textContent = 'Lien copié'; } catch (e) { input.focus(); input.select(); copy.textContent = 'Copiez avec Ctrl+C'; } setTimeout(() => { copy.textContent = 'Copier le lien'; }, 2500); });
+      row.append(input, copy); card.append(row);
+      const rec = loadActive(); card.append(buildNotify(v.ticket, !!(rec && rec.ticket === v.ticket && rec.n)));
+    } else {
+      card.append(el('p', 'track-note', 'Une seule question est traitée à la fois. Gardez cette page ouverte : votre question démarrera automatiquement.'));
+    }
+    const actions = el('div', 'track-actions');
+    const play = el('button', 'btn btn-ghost', 'Patienter en jouant (facultatif)'); play.type = 'button'; play.setAttribute('aria-expanded', 'false');
+    const gameBox = el('div', 'track-game'); gameBox.hidden = true;
+    play.addEventListener('click', () => toggleGame(tr, play, gameBox, true));
+    const del = el('button', 'btn btn-link', persistent() ? 'Supprimer ma question' : 'Quitter la file d\'attente'); del.type = 'button';
+    let armed = null;
+    del.addEventListener('click', () => {
+      if (persistent() && !armed) { del.textContent = 'Confirmer la suppression'; armed = setTimeout(() => { del.textContent = 'Supprimer ma question'; armed = null; }, 4000); return; }
+      clearTimeout(armed); armed = null; leaveTrack(tr);
+    });
+    actions.append(play, del); card.append(actions, gameBox); box.append(card);
+    $('sources').replaceChildren(el('p', 'placeholder', 'Les sources s\'afficheront avec la réponse.'));
+    state.tr = tr;
+  }
+
+  function toggleGame(tr, play, gameBox, open) {
+    tr.gameOpen = open; gameBox.hidden = !open; play.setAttribute('aria-expanded', String(open));
+    if (open && !tr.game && window.RegAssistGame) tr.game = window.RegAssistGame.mount(gameBox, { onBack: () => { toggleGame(tr, play, gameBox, false); play.focus(); } });
+    if (!open && tr.onGameClose) { const f = tr.onGameClose; tr.onGameClose = null; f(); }
+  }
+
+  function updateTrack(v, q) {
+    if (!state.tr) buildTrack(v, q);
+    const t = state.tr; const idx = v.state === 'queued' ? 1 : v.state === 'running' ? 2 : 3;
+    t.items.forEach((li, i) => { li.classList.toggle('is-done', i < idx); li.classList.toggle('is-current', i === idx); if (i === idx) li.setAttribute('aria-current', 'step'); else li.removeAttribute('aria-current'); });
+    let announce;
+    if (v.state === 'queued') {
+      const n = v.ahead === 1 ? '1 question avant la vôtre' : v.ahead + ' questions avant la vôtre';
+      t.detail.textContent = 'N° ' + v.position + ' dans la file · ' + n + '. Attente estimée : ' + fmtEta(v.eta_s) + ' (estimation d\'après les dernières réponses, non garantie).';
+      announce = !t.last ? 'Question envoyée. Elle est en attente de traitement, position ' + v.position + '.' : 'En attente de traitement, position ' + v.position + '.';
+    } else {
+      t.since = t.since || Date.now() - (v.run_s || 0) * 1000;
+      t.detail.textContent = 'Votre question est en cours de traitement depuis ' + fmtDur(Math.round((Date.now() - t.since) / 1000)) + '. La durée n\'est pas connue à l\'avance.';
+      announce = 'C\'est votre tour : votre question est en cours de traitement.';
+    }
+    const key = v.state + ':' + (v.position || 0);
+    if (key !== t.last) { t.live.textContent = announce; t.last = key; }
+  }
+
+  async function leaveTrack(tr) {                   // quitter la file (file en mémoire) ou supprimer la question (file persistante)
+    const t = state.ticket; state.cancelled = true;
+    let removed = false;
+    if (t) { try { const r = await queueCall('/' + encodeURIComponent(t) + '/cancel', { method: 'POST' }); removed = !!(r.data && r.data.cancelled); } catch (e) { /* injoignable : le délai de conservation s'appliquera */ } }
+    if (!removed && persistent()) { state.cancelled = false; tr.detail.textContent = 'Le traitement a déjà commencé : la question pourra être supprimée dès que la réponse sera prête.'; return; }
+    clearActive(); setHash(null);
+  }
+
+  function flagTitle() {                            // onglet en arrière-plan : le titre signale la fin
+    if (!document.hidden) return;
+    const old = document.title; document.title = 'Réponse prête - ' + old;
+    const back = () => { document.title = old; window.removeEventListener('focus', back); document.removeEventListener('visibilitychange', back); };
+    window.addEventListener('focus', back); document.addEventListener('visibilitychange', back);
+  }
+
+  function waitForReader() {                        // pendant une partie, la réponse n'interrompt pas le joueur : un bandeau l'invite à la lire
+    const t = state.tr; if (!t || !t.gameOpen) return Promise.resolve();
+    return new Promise((resolve) => {
+      const b = el('div', 'track-ready'); b.setAttribute('role', 'status'); const btn = el('button', 'btn btn-primary', 'Lire la réponse'); btn.type = 'button';
+      b.append(el('span', null, 'Votre réponse est prête.'), btn); t.card.prepend(b);
+      btn.addEventListener('click', () => { t.onGameClose = null; resolve(); });
+      t.onGameClose = resolve;
+    });
+  }
+
+  function afterLeave() {
+    resetWorkspace();
+    if (persistent()) $('answer').replaceChildren(callout('info', 'Question supprimée', 'Votre question a été supprimée du serveur. Vous pouvez en poser une autre.'));
+  }
+
+  async function followTicket(v, q) {
+    state.ticket = v.ticket; state.cancelled = false; state.tr = null;
+    let fails = 0;
     try {
-      let v = null;
       while (true) {
-        let r;
-        try {
-          r = first
-            ? await queueCall('', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ question: q }) })
-            : await queueCall('/' + encodeURIComponent(v.ticket), { cache: 'no-store' });
-        } catch (e) {
-          if (first || ++fails >= 8) { renderError('Le service est momentanément injoignable. Réessayez dans un instant.'); return null; }
-          await sleep(QUEUE_POLL_MS); continue;
-        }
-        if (!r.data) { if (r.res.status === 401) return null; renderError('Le service a répondu par une erreur (' + r.res.status + ').'); return null; }
-        fails = 0;
-        if (r.data.error && !r.data.state) { renderError(r.res.status === 404 && !first ? 'Votre place dans la file a expiré. Posez de nouveau votre question.' : r.data.error.message); return null; }
-        v = r.data; first = false;
-        if (v.state === 'done') return v.result;
+        if (v.state === 'done') { flagTitle(); await waitForReader(); return v; }
         if (v.state === 'error') { renderError((v.error && v.error.message) || 'La question n\'a pas pu être traitée.'); return null; }
-        state.ticket = v.ticket;
-        if (state.cancelled) { resetWorkspace(); return null; }
-        if (v.state === 'queued') updateQueueCard(v);
-        else if (state.qui) { state.qui = null; renderLoading(); }          // c'est son tour : retour à l'affichage « traitement en cours »
-        if (Date.now() - t0 > QUEUE_MAX_WAIT_MS) { renderError('L\'attente a dépassé 45 minutes. Réessayez plus tard.'); return null; }
-        await sleep(QUEUE_POLL_MS);
-        if (state.cancelled) { resetWorkspace(); return null; }
+        if (state.cancelled) { afterLeave(); return null; }
+        updateTrack(v, q);
+        await sleep(document.hidden ? QUEUE_POLL_HIDDEN_MS : QUEUE_POLL_MS);
+        if (state.cancelled) { afterLeave(); return null; }
+        let r;
+        try { r = await queueCall('/' + encodeURIComponent(v.ticket), { cache: 'no-store' }); } catch (e) { r = null; }
+        if (!r || !r.data || r.res.status === 429 || r.res.status >= 500) {          // réseau coupé ou service momentanément indisponible : on réessaie, sans rien perdre
+          fails++; if (state.tr) state.tr.net.hidden = false;
+          if (!persistent() && fails >= 8) { renderError('Le service est momentanément injoignable. Réessayez dans un instant.'); return null; }
+          await sleep(Math.min(30000, 3000 * fails));
+          continue;
+        }
+        fails = 0; if (state.tr) state.tr.net.hidden = true;
+        if (r.res.status === 404) { clearActive(); setHash(null); renderError('Cette demande n\'existe plus : elle a été supprimée ou son délai de conservation est dépassé. Posez de nouveau votre question.'); return null; }
+        if (r.data.error && !r.data.state) { renderError(r.data.error.message); return null; }
+        v = r.data;
       }
     } finally {
-      state.ticket = null; state.qui = null;
+      state.ticket = null; if (state.tr && state.tr.game) state.tr.game.destroy(); state.tr = null;
     }
+  }
+
+  async function askQueued(q) {                     // nouvelle question : dépôt, puis suivi
+    state.cancelled = false; renderLoading();
+    const key = state.idem && state.idem.q === q ? state.idem.key : newKey();           // même clé pour un nouvel essai de la même question : jamais de doublon
+    state.idem = { q, key };
+    let r;
+    try { r = await queueCall('', { method: 'POST', headers: { 'Content-Type': 'application/json', 'Idempotency-Key': key }, body: JSON.stringify({ question: q }) }); }
+    catch (e) { renderError('Le service est momentanément injoignable : votre question n\'a pas été envoyée. Vous pouvez la renvoyer sans risque de doublon.'); return null; }
+    if (!r.data) { renderError('Le service a répondu par une erreur (' + r.res.status + ').'); return null; }
+    if (r.data.error && !r.data.state) { state.idem = null; renderError(r.data.error.message); return null; }
+    state.idem = null;
+    let v = r.data;
+    if (v.state === 'done' && !v.ticket) return { result: v.result };                   // salutation : réponse immédiate
+    if (persistent()) { saveActive(v.ticket, q, false); setHash(v.ticket); }
+    v = await followTicket(v, q);
+    if (!v) return null;
+    clearActive(); setHash(null);
+    return { result: v.result, ticket: persistent() ? v.ticket : null, exp: Date.now() + (v.expires_in_s || 0) * 1000 };
+  }
+
+  async function resumeTracking(ticket) {           // retour sur le site avec un lien personnel, une notification ou une question encore en cours
+    if (state.busy || !TICKET_RE.test(ticket) || !queueOn()) return;
+    state.busy = true; updateComposer(); renderLoading();
+    try {
+      let r;
+      try { r = await queueCall('/' + encodeURIComponent(ticket), { cache: 'no-store' }); } catch (e) { renderError('Le service est momentanément injoignable. Rechargez la page pour reprendre le suivi : votre question n\'est pas perdue.'); return; }
+      if (!r.data || r.res.status === 404 || (r.data.error && !r.data.state)) {
+        clearActive(); setHash(null); resetWorkspace();
+        $('answer').replaceChildren(callout('info', 'Demande introuvable', 'Cette demande n\'existe plus : elle a été supprimée ou son délai de conservation est dépassé. Vous pouvez poser de nouveau votre question.'));
+        return;
+      }
+      const known = findEntry(ticket);
+      if (known) { clearActive(); setHash(null); openEntry(known.c.id, known.en.id); return; }
+      const q = r.data.question || ''; showQuestion(q);
+      const v = await followTicket(r.data, q);
+      if (v) { clearActive(); setHash(null); commitAnswer(q, v.result, { ticket, exp: Date.now() + (v.expires_in_s || 0) * 1000, viaLink: true }); }
+    } finally {
+      if (state.timer) { clearInterval(state.timer); state.timer = null; }
+      state.busy = false; refreshStatus(); updateComposer();
+    }
+  }
+
+  function findEntry(ticket) {
+    for (const c of state.convs) for (const en of c.entries) if (en.ticket === ticket) return { c, en };
+    return null;
+  }
+
+  // Sous une réponse conservée sur le serveur : date de suppression automatique et suppression immédiate.
+  function serverNote(entry) {
+    if (!entry.ticket || !entry.exp) return null;
+    const p = el('p', 'server-note'); const when = new Date(entry.exp).toLocaleDateString('fr-FR', { day: 'numeric', month: 'long' });
+    p.append(document.createTextNode('Cette question et sa réponse restent sur le serveur jusqu\'au ' + when + ', pour que vous puissiez les retrouver avec votre lien. '));
+    const b = el('button', 'btn btn-link', 'Les supprimer maintenant'); b.type = 'button'; let armed = null;
+    b.addEventListener('click', async () => {
+      if (!armed) { b.textContent = 'Confirmer la suppression'; armed = setTimeout(() => { b.textContent = 'Les supprimer maintenant'; armed = null; }, 4000); return; }
+      clearTimeout(armed); armed = null; b.disabled = true;
+      let gone = false; try { const r = await queueCall('/' + encodeURIComponent(entry.ticket) + '/cancel', { method: 'POST' }); gone = !!(r.data && r.data.cancelled) || (r.res.status === 200); } catch (e) { gone = false; }
+      if (gone) { delete entry.ticket; delete entry.exp; saveHistory(); p.textContent = 'Supprimées du serveur. L\'historique de ce navigateur n\'est pas modifié.'; } else { b.disabled = false; b.textContent = 'Les supprimer maintenant'; p.append(document.createTextNode(' Suppression impossible pour le moment.')); }
+    });
+    p.append(b);
+    return p;
   }
 
   /* ---------- disponibilité du service (aucun détail technique affiché) ---------- */
@@ -483,7 +653,18 @@
       state.maxQ = (state.status.limits && state.status.limits.max_question_chars) || DEFAULT_MAX_Q;
     } catch (e) { state.status = null; state.reachable = false; }
     state.checked = true;
+    renderPersistNotes();
     updateComposer();
+  }
+
+  // Avec la file persistante, la question est conservée sur le serveur : l'interface le dit avant l'envoi et dans « À propos » (le texte par défaut dit le contraire).
+  function renderPersistNotes() {
+    const on = persistent(); const note = $('persist-note');
+    note.hidden = !on; $('about-data').hidden = !on; $('about-data-default').hidden = on;
+    if (on) {
+      note.textContent = 'Pour vous permettre de fermer la page et de revenir lire la réponse, votre question et sa réponse sont conservées sur le serveur ' + days() + ', puis supprimées. Vous pouvez les supprimer à tout moment.';
+      $('about-data').textContent = "Pour vous permettre de fermer la page et de revenir lire la réponse, votre question et sa réponse sont conservées sur le serveur pendant " + days() + ", puis supprimées ; vous pouvez les supprimer à tout moment. Elles ne sont lisibles qu'avec votre lien personnel, et le texte des questions n'est pas écrit dans les journaux. Votre historique est enregistré dans votre navigateur ; vous pouvez l'effacer à tout moment.";
+    }
   }
 
   function toggleAbout(open) {
@@ -516,10 +697,17 @@
     $('btn-about').addEventListener('click', () => toggleAbout($('about-panel').hidden));
     $('btn-about-close').addEventListener('click', () => toggleAbout(false));
     document.addEventListener('keydown', (ev) => { if (ev.key === 'Escape' && !$('about-panel').hidden) toggleAbout(false); });
-    refreshStatus(); setInterval(() => { if (!document.hidden && !state.busy) refreshStatus(); }, POLL_MS);
+    refreshStatus().then(() => { const t = hashTicket() || (loadActive() || {}).ticket; if (t) resumeTracking(t); });            // lien personnel ou question encore en cours : le suivi reprend
+    setInterval(() => { if (!document.hidden && !state.busy) refreshStatus(); }, POLL_MS);
+    window.addEventListener('online', () => { if (state.wake) state.wake(); });
+    window.addEventListener('hashchange', () => { const t = hashTicket(); if (t && !state.busy) resumeTracking(t); });
+    if ('serviceWorker' in navigator) navigator.serviceWorker.addEventListener('message', (ev) => {          // clic sur une notification alors que le site est déjà ouvert
+      const m = ev.data && ev.data.type === 'open-ticket' ? /#q=([A-Za-z0-9_-]{16,64})$/.exec(String(ev.data.url)) : null;
+      if (m && !state.busy) resumeTracking(m[1]);
+    });
     window.addEventListener('focus', refreshStatus);
-    window.addEventListener('pagehide', () => {          // page fermée : on libère sa place dans la file
-      if (state.ticket) fetch('/api/queue/' + encodeURIComponent(state.ticket) + '/cancel', { method: 'POST', keepalive: true }).catch(() => {});
+    window.addEventListener('pagehide', () => {          // file en mémoire seulement : page fermée = place libérée (la file persistante conserve la demande)
+      if (state.ticket && !persistent()) fetch('/api/queue/' + encodeURIComponent(state.ticket) + '/cancel', { method: 'POST', keepalive: true }).catch(() => {});
     });
     $('question').focus();
   }

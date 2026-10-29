@@ -102,7 +102,8 @@ code_noauth="$(curl -s -o /dev/null -w '%{http_code}' --max-time 15 "https://${D
 queue="$(curl -s --max-time 15 "https://${DOMAIN}/api/status" | python3 -c 'import sys, json
 try:
     q = json.load(sys.stdin).get("queue", {})
-    print("active (max %s)" % q.get("max") if q.get("enabled") else "ABSENTE")
+    print(("active (max %s, %s, notifications %s)" % (q.get("max"), "persistante %s j" % q.get("retention_days") if q.get("persistent") else "en memoire seulement",
+          "actives" if (q.get("push") or {}).get("enabled") else "absentes")) if q.get("enabled") else "ABSENTE")
 except Exception:
     print("non verifiee (acces protege ?)")' 2>/dev/null || echo "non verifiee")"
 greeting="$(curl -s --max-time 60 -H 'Content-Type: application/json' -d '{"question":"bonjour"}' "https://${DOMAIN}/api/queue" | python3 -c 'import sys, json

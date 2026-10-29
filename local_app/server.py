@@ -19,12 +19,13 @@ from werkzeug.serving import ThreadedWSGIServer
 
 from . import config as C
 from . import lan as L
-from . import smalltalk, waitqueue
+from . import smalltalk, waitqueue, webpush
 from .service import Service, ServiceError, check_environment, setup_logging, validate_payload
 
 CSP = ("default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src 'self'; font-src 'self'; "
-       "base-uri 'none'; form-action 'none'; frame-ancestors 'none'")
-_PAGES = {"": "index.html", "index.html": "index.html", "app.css": "app.css", "app.js": "app.js", "favicon.svg": "favicon.svg", "login.css": "login.css"}
+       "base-uri 'none'; form-action 'none'; frame-ancestors 'none'; worker-src 'self'")
+_PAGES = {"": "index.html", "index.html": "index.html", "app.css": "app.css", "app.js": "app.js", "favicon.svg": "favicon.svg", "login.css": "login.css",
+          "game.js": "game.js", "sw.js": "sw.js"}
 # Mode réseau seulement : ce qui reste accessible sans code d'accès (la page d'accès et ses ressources, la sonde de vie qui ne renvoie que « ok »).
 _PUBLIC_IN_LAN = {"/login", "/login.css", "/favicon.svg", "/favicon.ico", "/api/health"}
 _TICKET = re.compile(r"[A-Za-z0-9_-]{16,64}")
@@ -280,7 +281,8 @@ def create_app(service: Service, port: int | None = None, lan: "L.LanAccess | No
                             "result": service.chat(data), "error": None})
         if service.warming():
             raise ServiceError(503, "warming_up", "Le service démarre. Réessayez dans quelques secondes.")
-        return jsonify(app.wait_queue.submit(data, client_ip)), 202
+        kw = {"key": request.headers.get("Idempotency-Key")} if getattr(app.wait_queue, "persistent", False) else {}      # la clé d'envoi évite les doublons après une coupure réseau
+        return jsonify(app.wait_queue.submit(data, client_ip, **kw)), 202
 
     @app.get("/api/queue/<ticket>")
     def queue_view(ticket):
@@ -288,6 +290,39 @@ def create_app(service: Service, port: int | None = None, lan: "L.LanAccess | No
         if view is None:
             return err(404, "ticket_unknown", "Cette question n'est plus dans la file (délai dépassé ou annulation). Posez-la de nouveau.")
         return jsonify(view)
+
+    @app.post("/api/queue/<ticket>/push")
+    def queue_push(ticket):
+        """Abonnement Web Push du navigateur, attaché à cette demande (file persistante et notifications activées seulement)."""
+        q = app.wait_queue
+        push = (q.snapshot().get("push") or {}) if q is not None and getattr(q, "persistent", False) else {}
+        if not push.get("enabled"):
+            return err(404, "not_found", "Ressource introuvable.")
+        client_ip = extract_client_ip(request, mode)
+        allowed, retry_after = app.rate_limiter.is_allowed(client_ip)
+        if not allowed:
+            resp = err(429, "rate_limited", f"Trop de requêtes. Veuillez patienter {retry_after} seconde(s).")
+            resp.headers["Retry-After"] = str(retry_after)
+            return resp
+        if request.mimetype != "application/json":
+            return err(415, "unsupported_media_type", "Type de contenu non pris en charge : JSON attendu.")
+        data = request.get_json(silent=True)
+        if not isinstance(data, dict) or set(data) != {"subscription"}:
+            return err(400, "invalid_request", "Corps JSON attendu : {\"subscription\": {...}}.")
+        try:
+            sub = webpush.validate_subscription(data["subscription"])
+        except (ValueError, TypeError):
+            return err(400, "invalid_subscription", "Abonnement aux notifications non reconnu.")
+        if not _TICKET.fullmatch(ticket):
+            return err(404, "ticket_unknown", "Cette question n'est plus dans la file (délai dépassé ou annulation). Posez-la de nouveau.")
+        res = q.add_push(ticket, sub)
+        if res == "unknown":
+            return err(404, "ticket_unknown", "Cette question n'est plus dans la file (délai dépassé ou annulation). Posez-la de nouveau.")
+        if res == "finished":
+            return err(409, "already_finished", "La réponse est déjà prête : ouvrez le suivi pour la lire.")
+        if res == "limit":
+            return err(429, "push_limit", "Trop d'appareils déjà abonnés pour cette question.")
+        return jsonify({"subscribed": True}), 201
 
     @app.post("/api/queue/<ticket>/cancel")
     def queue_cancel(ticket):

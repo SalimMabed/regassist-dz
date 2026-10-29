@@ -343,8 +343,233 @@ test('affichage étroit (téléphone) : pas de défilement horizontal, volets em
   } finally { await send('Emulation.clearDeviceMetricsOverride'); }
 });
 
+/* ---------- suivi persistant, notifications, mini-jeu (serveur de test avec file persistante, UI_URL_PERSIST) ---------- */
+const URL_PERSIST = process.env.UI_URL_PERSIST;
+const reopen = async (url) => { await nav('about:blank'); await nav(url); };           // vraie réouverture : une navigation vers la même adresse + fragment ne rechargerait pas la page
+const askTracked = async (q = 'plafond') => { await ask(q); await waitFor(`!!document.querySelector('.track')`, 'fiche de suivi'); };
+const answered = (what = 'réponse affichée') => waitFor(`!!document.querySelector('#answer .ans-text')`, what, 40000);
+const historyTicket = () => ev(`JSON.parse(localStorage.getItem('regassist.history.v1')).convs.flatMap((c) => c.entries).map((e) => e.ticket).filter(Boolean).pop()`);
+const status = (path, init = '') => ev(`fetch(${JSON.stringify(path)}${init ? ', ' + init : ''}).then((r) => r.status)`);
+
+test('suivi persistant : conservation annoncée avant l\'envoi, fiche de suivi, lien personnel, puis réponse', async () => {
+  await fresh(URL_PERSIST);
+  assert.match(await ev(`document.getElementById('persist-note').innerText`), /conservées sur le serveur 7 jours/);
+  await ev(`document.getElementById('btn-about').click()`);
+  const about = await ev(`document.getElementById('about-panel').innerText`);
+  assert.match(about, /conservées sur le serveur pendant 7 jours/);
+  assert.ok(!about.includes('ne conserve pas le texte de vos questions'), 'la phrase par défaut serait fausse ici : elle ne doit plus être visible');
+  await ev(`document.getElementById('btn-about-close').click()`);
+  await askTracked();
+  assert.equal(await count('.track-step'), 4);
+  assert.equal(await count('.track-step[aria-current="step"]'), 1);
+  assert.match(await ev('location.hash'), /^#q=[A-Za-z0-9_-]{22}$/, 'le lien personnel est dans le fragment, jamais envoyé au serveur');
+  assert.equal(await ev(`document.querySelector('.track-link input').value.endsWith(location.hash)`), true);
+  assert.match(await text('.track'), /Vous pouvez fermer cette page/);
+  assert.equal(await ev(`!!localStorage.getItem('regassist.active.v1')`), true);
+  await assertNoTechnicalDetail('suivi');
+  await answered();
+  assert.equal(await ev('location.hash'), '');
+  assert.equal(await ev(`localStorage.getItem('regassist.active.v1')`), null, 'plus rien à reprendre une fois la réponse lue');
+  assert.match(await text('.server-note'), /restent sur le serveur jusqu'au/);
+});
+
+test('retour sur le site : rechargement en plein traitement, puis lien ouvert sans aucune donnée locale', async () => {
+  await fresh(URL_PERSIST);
+  await askTracked();
+  const link = URL_PERSIST + (await ev('location.hash'));
+  await reopen(link);                                                               // la page est fermée puis rouverte avec le lien : le suivi reprend
+  await answered('réponse retrouvée après rechargement');
+  assert.match(await text('#answer'), /Réponse retrouvée avec votre lien personnel/);
+  assert.equal(await count('.hist-item'), 1);
+  const ticket = await historyTicket();
+  await ev('localStorage.clear()');                                                 // autre appareil : seul le lien est connu
+  await reopen(URL_PERSIST + '#q=' + ticket);
+  await answered('réponse lue avec le seul lien');
+  assert.match(await text('#question-echo'), /plafond/);
+  await ev('localStorage.clear()'); await nav('about:blank'); await nav(URL_PERSIST);
+  const again = await ev(`document.getElementById('answer').innerText`);
+  assert.match(again, /Posez une question/, 'sans lien ni suivi en cours, rien d\'une autre personne n\'est affiché');
+});
+
+test('reprise sans le lien : la question en cours est retrouvée par le navigateur', async () => {
+  await fresh(URL_PERSIST);
+  await askTracked();
+  await reopen(URL_PERSIST);                                                        // adresse nue : le suivi est repris depuis le stockage local
+  await waitFor(`!!document.querySelector('.track') || !!document.querySelector('#answer .ans-text')`, 'suivi repris');
+  await answered();
+});
+
+test('suppression : la question disparaît du serveur et le lien cesse de fonctionner', async () => {
+  await fresh(URL_PERSIST);
+  await ask('plafond'); await answered();
+  const ticket = await historyTicket();
+  assert.equal(await status('/api/queue/' + ticket), 200);
+  await ev(`document.querySelector('.server-note .btn').click()`);
+  assert.match(await text('.server-note .btn'), /Confirmer la suppression/, 'une suppression demande une confirmation');
+  await ev(`document.querySelector('.server-note .btn').click()`);
+  await waitFor(`document.querySelector('.server-note').textContent.includes('Supprimées du serveur')`, 'suppression confirmée');
+  assert.equal(await status('/api/queue/' + ticket), 404);
+  await reopen(URL_PERSIST + '#q=' + ticket);
+  await waitFor(`document.getElementById('answer').innerText.includes('Demande introuvable')`, 'message neutre pour une demande supprimée');
+});
+
+test('demande inexistante ou lien d\'une autre personne : message neutre, aucune information, service utilisable', async () => {
+  await fresh(URL_PERSIST);
+  await reopen(URL_PERSIST + '#q=' + 'A'.repeat(22));
+  await waitFor(`document.getElementById('answer').innerText.includes('Demande introuvable')`, 'message neutre');
+  const t = await ev(`document.getElementById('answer').innerText`);
+  assert.ok(!/existe|appartient|autre/i.test(t.replace('n\'existe plus', '')), 'aucune distinction entre inexistante et non autorisée : ' + t);
+  await reopen(URL_PERSIST + '#q=../../etc/passwd');                                // lien mal formé : ignoré, jamais envoyé au serveur
+  assert.equal(await ev(`document.getElementById('answer').innerText.includes('Demande introuvable')`), false);
+  assert.equal(requests.filter((u) => u.includes('/etc/passwd')).length, 0);
+  await fresh(URL_PERSIST); await ask('plafond'); await answered();
+});
+
+test('notifications : proposition facultative, jamais bloquante ; refus, navigateur sans notification ou autorisation révoquée', async () => {
+  await fresh(URL_PERSIST);
+  await ask('plafond'); await waitFor(`!!document.querySelector('.track-notify')`, 'bloc de notification');
+  const before = requests.filter((u) => u.endsWith('/sw.js')).length;
+  assert.ok((await text('.track-notify .track-note')).length > 30, 'une explication ou une solution de repli est toujours affichée');
+  assert.equal(requests.filter((u) => u.endsWith('/sw.js')).length, before, 'aucun service worker ni abonnement sans clic volontaire');
+  await answered();
+  // 1. refus de l'autorisation
+  await fresh(URL_PERSIST);
+  await ev(`Object.defineProperty(Notification, 'permission', { get: () => 'default', configurable: true }); Notification.requestPermission = () => Promise.resolve('denied');`);
+  await ask('plafond'); await waitFor(`!!document.querySelector('.track-notify .btn') && !document.querySelector('.track-notify .btn').hidden`, 'bouton de notification');
+  assert.match(await text('.track-notify .track-note'), /Facultatif.*ni votre question ni la réponse.*Si vous refusez, rien d'autre ne change/s);
+  await ev(`document.querySelector('.track-notify .btn').click()`);
+  await waitFor(`document.querySelector('.track-notify .track-note').textContent.includes('Notification non activée')`, 'refus géré');
+  assert.equal(requests.filter((u) => u.endsWith('/sw.js')).length, before, 'refus : aucun service worker enregistré');
+  await answered('réponse malgré le refus');
+  // 2. navigateur sans Web Push
+  await fresh(URL_PERSIST);
+  await ev(`delete window.PushManager`);
+  await ask('plafond'); await waitFor(`!!document.querySelector('.track-notify')`, 'bloc');
+  assert.match(await text('.track-notify .track-note'), /ne gère pas les notifications/);
+  assert.equal(await ev(`document.querySelector('.track-notify .btn').hidden`), true);
+  await answered('réponse sans notifications');
+  // 3. autorisation révoquée dans le navigateur
+  await fresh(URL_PERSIST);
+  await ev(`Object.defineProperty(Notification, 'permission', { get: () => 'denied', configurable: true })`);
+  await ask('plafond'); await waitFor(`!!document.querySelector('.track-notify')`, 'bloc');
+  assert.match(await text('.track-notify .track-note'), /bloquées pour ce site/);
+  await answered('réponse malgré le blocage');
+});
+
+test('mini-jeu : facultatif, clavier et souris, résultat, rejouer, retour au suivi, aucune requête', async () => {
+  await fresh(URL_PERSIST);
+  await ask('plafond'); await waitFor(`!!document.querySelector('.track')`, 'suivi');
+  assert.equal(await count('.game'), 0, 'le jeu n\'est jamais lancé sans demande');
+  await ev(`[...document.querySelectorAll('.track-actions .btn')].find((b) => /jouant/.test(b.textContent)).click()`);
+  await waitFor(`document.querySelectorAll('.game-card').length === 12`, 'cartes');
+  assert.equal(await ev(`document.querySelector('.track-actions .btn').getAttribute('aria-expanded')`), 'true');
+  const reqs = B.requests.length;
+  // clavier : une seule carte dans l'ordre de tabulation, les flèches déplacent le focus
+  await ev(`document.querySelectorAll('.game-card')[0].focus()`);
+  assert.equal(await ev(`document.querySelectorAll('.game-card[tabindex="0"]').length`), 1);
+  await ev(`document.activeElement.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowRight', bubbles: true }))`);
+  assert.equal(await ev(`[...document.querySelectorAll('.game-card')].indexOf(document.activeElement)`), 1);
+  await ev(`document.activeElement.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowDown', bubbles: true }))`);
+  assert.equal(await ev(`[...document.querySelectorAll('.game-card')].indexOf(document.activeElement)`), 5);
+  assert.match(await ev(`document.activeElement.getAttribute('aria-label')`), /^Carte 6 sur 12, face cachée$/, 'nom accessible : jamais de carte sans libellé');
+  // une erreur, puis toutes les paires
+  await ev(`(async () => {
+    const cards = [...document.querySelectorAll('.game-card')]; const by = {};
+    cards.forEach((c, i) => (by[c.dataset.sym] = by[c.dataset.sym] || []).push(i));
+    const k = Object.keys(by); cards[by[k[0]][0]].click(); cards[by[k[1]][0]].click();
+    await new Promise((r) => setTimeout(r, 1100));
+    for (const s of k) { cards[by[s][0]].click(); cards[by[s][1]].click(); }
+  })()`);
+  await waitFor(`/^Terminé en \\d+ coups/.test(document.querySelector('.game-result').textContent)`, 'résultat final');
+  assert.equal(await count('.game-card.is-matched'), 12);
+  assert.match(await text('.game-stats'), /Meilleur résultat : \d+ coups/);
+  await ev(`[...document.querySelectorAll('.game-actions .btn')].find((b) => b.textContent === 'Rejouer').click()`);
+  assert.equal(await count('.game-card.is-matched'), 0);
+  assert.equal(await text('.game-result'), '');
+  await ev(`[...document.querySelectorAll('.game-actions .btn')].find((b) => b.textContent === 'Retour au suivi').click()`);
+  const closed = await ev(`({ hidden: (document.querySelector('.track-game') || { hidden: true }).hidden, focusOk: !document.querySelector('.track-game') || /jouant/.test(document.activeElement.textContent) })`);
+  assert.equal(closed.hidden, true);
+  assert.equal(closed.focusOk, true, 'le focus revient au bouton qui a ouvert le jeu');
+  const jeu = B.requests.slice(reqs).filter((u) => !/\/api\/queue\/[A-Za-z0-9_-]+$/.test(u) && !u.endsWith('/api/status'));
+  assert.deepEqual(jeu, [], 'le jeu ne fait aucune requête (hors suivi de la question) : ' + jeu.join(', '));
+  await answered();
+});
+
+test('réponse prête pendant une partie : un bandeau invite à la lire, la partie n\'est pas interrompue', async () => {
+  await fresh(URL_PERSIST);
+  await ask('plafond'); await waitFor(`!!document.querySelector('.track')`, 'suivi');
+  await ev(`[...document.querySelectorAll('.track-actions .btn')].find((b) => /jouant/.test(b.textContent)).click()`);
+  await waitFor(`!!document.querySelector('.track-ready')`, 'bandeau « réponse prête »', 40000);
+  assert.equal(await count('.game'), 1, 'la partie continue');
+  assert.equal(await exists('#answer .ans-text'), false, 'la réponse ne remplace pas la partie sans accord du joueur');
+  await ev(`document.querySelector('.track-ready .btn').click()`);
+  await answered();
+  assert.equal(await count('.game'), 0);
+});
+
+test('mouvement réduit : le suivi n\'anime rien ; sans préférence, le point de l\'étape en cours pulse', async () => {
+  const media = (v) => send('Emulation.setEmulatedMedia', { features: [{ name: 'prefers-reduced-motion', value: v }] });
+  try {
+    await media('reduce'); await fresh(URL_PERSIST);
+    await ask('plafond'); await waitFor(`!!document.querySelector('.track-step.is-current')`, 'étape en cours');
+    assert.equal(await ev(`getComputedStyle(document.querySelector('.track-step.is-current .track-dot')).animationName`), 'none');
+    await answered();
+    await media('no-preference'); await fresh(URL_PERSIST);
+    await ask('plafond'); await waitFor(`!!document.querySelector('.track-step.is-current')`, 'étape en cours');
+    assert.equal(await ev(`getComputedStyle(document.querySelector('.track-step.is-current .track-dot')).animationName`), 'track-pulse');
+    await answered();
+  } finally { await send('Emulation.setEmulatedMedia', { features: [] }); }
+});
+
+test('téléphone (375 px) : suivi et jeu sans défilement horizontal, cartes assez grandes pour le toucher', async () => {
+  await send('Emulation.setDeviceMetricsOverride', { width: 375, height: 812, deviceScaleFactor: 1, mobile: true });
+  try {
+    await fresh(URL_PERSIST);
+    await ask('plafond'); await waitFor(`!!document.querySelector('.track')`, 'suivi');
+    await ev(`[...document.querySelectorAll('.track-actions .btn')].find((b) => /jouant/.test(b.textContent)).click()`);
+    await waitFor(`document.querySelectorAll('.game-card').length === 12`, 'cartes');
+    const m = await ev(`({ sw: document.documentElement.scrollWidth, iw: window.innerWidth, card: Math.round(document.querySelector('.game-card').getBoundingClientRect().width),
+      input: Math.round(document.querySelector('.track-link input').getBoundingClientRect().width) })`);
+    assert.ok(m.sw <= m.iw + 1, `défilement horizontal : ${m.sw} > ${m.iw}`);
+    assert.ok(m.card >= 44, 'cible tactile trop petite : ' + m.card);
+    assert.ok(m.input >= 120, 'lien illisible : ' + m.input);
+    await waitFor(`!!document.querySelector('.track-ready')`, 'bandeau « réponse prête » pendant la partie', 40000);          // la partie n'est pas interrompue : le joueur choisit quand lire
+    await ev(`document.querySelector('.track-ready .btn').click()`);
+    await answered();
+  } finally { await send('Emulation.clearDeviceMetricsOverride'); }
+});
+
+test('réseau coupé pendant l\'attente : message rassurant, puis reprise sans rien perdre', async () => {
+  await fresh(URL_PERSIST);
+  await askTracked();
+  await ev(`window.__f = window.fetch; window.fetch = () => Promise.reject(new TypeError('Failed to fetch'))`);
+  await waitFor(`!document.querySelector('.track-net').hidden`, 'message de connexion interrompue', 20000);
+  assert.match(await text('.track-net'), /Votre question n'est pas perdue/);
+  await ev(`window.fetch = window.__f; window.dispatchEvent(new Event('online'))`);
+  await answered('réponse après le retour du réseau');
+});
+
+test('double envoi : un seul dépôt ; après une coupure, le nouvel essai réutilise la même clé (aucun doublon)', async () => {
+  await fresh(URL_PERSIST);
+  await ev(`window.__posts = []; window.__f = window.fetch; window.fetch = (u, i) => { if (u === '/api/queue' && i && i.method === 'POST') window.__posts.push(i.headers['Idempotency-Key']); return window.__f(u, i); };`);
+  await ev(`(() => { const t = document.getElementById('question'); t.value = 'plafond'; t.dispatchEvent(new Event('input', { bubbles: true })); const f = document.getElementById('form'); f.requestSubmit(); f.requestSubmit(); })()`);
+  await answered();
+  assert.equal(await ev('window.__posts.length'), 1, 'deux envois immédiats : un seul dépôt');
+  await fresh(URL_PERSIST);
+  await ev(`window.__posts = []; window.__f = window.fetch; window.__fail = true;
+    window.fetch = (u, i) => { if (u === '/api/queue' && i && i.method === 'POST') { window.__posts.push(i.headers['Idempotency-Key']); if (window.__fail) { window.__fail = false; return Promise.reject(new TypeError('Failed to fetch')); } } return window.__f(u, i); };`);
+  await ask('plafond');
+  await waitFor(`document.getElementById('answer').innerText.includes('sans risque de doublon')`, 'message après la coupure');
+  await ev(`document.getElementById('form').requestSubmit()`);
+  await answered();
+  const keys = await ev('window.__posts');
+  assert.equal(keys.length, 2); assert.equal(keys[0], keys[1], 'même clé d\'envoi pour le nouvel essai');
+  assert.match(keys[0], /^[A-Za-z0-9_-]{16,64}$/);
+});
+
+
 test('aucune ressource externe : toutes les requêtes du navigateur visent l\'application, aucune violation CSP, aucune exception', async () => {
-  const foreign = requests.filter((u) => !(u.startsWith(ORIGIN + '/') || (URL_OFF && u.startsWith(new URL(URL_OFF).origin + '/')) || u.startsWith('data:') || u === 'about:blank'));
+  const foreign = requests.filter((u) => !(u.startsWith(ORIGIN + '/') || (URL_OFF && u.startsWith(new URL(URL_OFF).origin + '/')) || (URL_PERSIST && u.startsWith(new URL(URL_PERSIST).origin + '/')) || u.startsWith('data:') || u === 'about:blank'));
   assert.deepEqual(foreign, [], 'requêtes hors application : ' + foreign.join(', '));
   assert.ok(requests.length > 20, 'les requêtes ont bien été observées (' + requests.length + ')');
   assert.deepEqual(B.violations, [], 'violations de la politique CSP');

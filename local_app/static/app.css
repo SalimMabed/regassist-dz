@@ -902,8 +902,8 @@ h1, h2, h3, h4, p {
   color: var(--accent-primary);
 }
 
-/* File d'attente : position, questions devant la sienne, attente estimée */
-.queue-card {
+/* Suivi d'une question : étapes réelles, lien personnel, notification facultative */
+.track {
   margin-top: 8px;
   padding: 16px 18px;
   background: var(--bg-subtle);
@@ -912,32 +912,202 @@ h1, h2, h3, h4, p {
   border-radius: var(--radius-md);
 }
 
-.queue-head {
-  font-size: 12px;
-  font-weight: 700;
-  letter-spacing: .05em;
-  text-transform: uppercase;
+.track-steps {
+  list-style: none;
+  margin: 0 0 12px;
+  padding: 0;
+  display: grid;
+  gap: 8px;
+}
+
+.track-step {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 13.5px;
   color: var(--text-muted);
 }
 
-.queue-pos {
-  margin: 6px 0 4px;
-  font-size: 24px;
-  font-weight: 700;
-  line-height: 1.2;
-  color: var(--accent-hover);
+.track-dot {
+  flex: none;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  border: 2px solid var(--border-strong);
+  background: var(--bg-surface);
 }
 
-.queue-line {
+.track-step.is-done { color: var(--text-secondary); }
+.track-step.is-done .track-dot { background: var(--accent-primary); border-color: var(--accent-primary); }
+.track-step.is-current { color: var(--text-primary); font-weight: 700; }
+.track-step.is-current .track-dot { border-color: var(--accent-primary); }
+
+@media (prefers-reduced-motion: no-preference) {
+  .track-step.is-current .track-dot { animation: track-pulse 1.8s ease-in-out infinite; }
+}
+
+@keyframes track-pulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(2, 112, 186, 0.35); }
+  50% { box-shadow: 0 0 0 5px rgba(2, 112, 186, 0); }
+}
+
+.track-detail {
+  margin: 0 0 10px;
   font-size: 13.5px;
+  line-height: 1.5;
   color: var(--text-secondary);
 }
 
-.queue-hint {
-  margin: 12px 0;
+.track-net {
+  margin: 0 0 10px;
+  padding: 6px 10px;
+  font-size: 12.5px;
+  color: var(--warn-fg);
+  background: var(--warn-bg);
+  border: 1px solid var(--warn-bd);
+  border-radius: var(--radius-sm);
+}
+
+.track-note {
+  margin: 10px 0;
   font-size: 12.5px;
   line-height: 1.5;
   color: var(--text-muted);
+}
+
+.track-link {
+  display: flex;
+  gap: 8px;
+  margin: 8px 0;
+}
+
+.track-link input {
+  flex: 1;
+  min-width: 0;
+  padding: 8px 10px;
+  font: 12.5px var(--font-mono);
+  color: var(--text-primary);
+  background: var(--bg-surface);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-sm);
+}
+
+.track-notify { margin: 12px 0; }
+.track-notify .btn { margin-top: 4px; }
+
+.track-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.track-ready {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 12px;
+  padding: 10px 12px;
+  font-weight: 700;
+  color: var(--badge-cited-text);
+  background: var(--badge-cited-bg);
+  border: 1px solid var(--badge-cited-border);
+  border-radius: var(--radius-sm);
+}
+
+.track-game { margin-top: 12px; }
+
+.server-note {
+  margin: 14px 0 0;
+  padding-top: 8px;
+  border-top: 1px solid var(--border-subtle);
+  font-size: 11.5px;
+  line-height: 1.5;
+  color: var(--text-muted);
+}
+
+.persist-note {
+  margin: 6px 0 0;
+  font-size: 12px;
+  line-height: 1.45;
+  color: var(--text-muted);
+}
+
+/* Mini-jeu facultatif : mémoire de paires */
+.game {
+  padding: 12px;
+  background: var(--bg-surface);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+}
+
+.game-head {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  font-size: 13.5px;
+}
+
+.game-help {
+  font-size: 12.5px;
+  color: var(--text-muted);
+}
+
+.game-stats {
+  margin: 8px 0;
+  font-size: 12.5px;
+  color: var(--text-secondary);
+}
+
+.game-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 8px;
+  max-width: 360px;
+}
+
+.game-card {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  aspect-ratio: 1 / 1;
+  min-height: 52px;
+  padding: 0;
+  font: inherit;
+  font-size: 26px;
+  line-height: 1;
+  color: var(--accent-hover);
+  background: var(--btn-primary-bg);
+  border: 1px solid var(--btn-primary-bg);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: background 120ms ease, border-color 120ms ease;
+}
+
+.game-card.is-open { background: var(--bg-surface); border-color: var(--accent-primary); }
+.game-card.is-matched { background: var(--accent-subtle); border-color: var(--accent-border); cursor: default; }
+.game-card:focus-visible { outline: 2px solid var(--accent-primary); outline-offset: 2px; }
+
+@media (prefers-reduced-motion: reduce) {
+  .game-card { transition: none; }
+}
+
+.game-result {
+  min-height: 1.4em;
+  margin: 8px 0 0;
+  font-size: 13.5px;
+  font-weight: 700;
+  color: var(--accent-hover);
+}
+
+.game-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 10px;
 }
 
 /* Textes proposés sans réponse directe */

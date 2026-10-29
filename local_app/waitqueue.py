@@ -160,4 +160,8 @@ def from_env(run, mode: str, log=None):
     n = num("REGASSIST_QUEUE_MAX", "8" if mode == "production" else "0", int)
     if n <= 0:
         return None
+    from . import persist                                    # file persistante (SQLite) quand le déploiement fournit un dossier de données ; sinon file en mémoire
+    pq = persist.from_env_persistent(run, mode, n, log=log)
+    if pq is not None:
+        return pq
     return WaitQueue(run, max_size=n, per_ip=num("REGASSIST_QUEUE_PER_IP", "2", int), eta_s=num("REGASSIST_QUEUE_ETA_S", "150", float), log=log)

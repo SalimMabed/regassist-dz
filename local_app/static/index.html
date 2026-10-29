@@ -64,6 +64,7 @@
         <span id="counter" class="counter">0 / 500</span>
         <button type="submit" id="btn-send" class="btn btn-primary">Envoyer</button>
       </div>
+      <p id="persist-note" class="persist-note" hidden></p>
     </form>
   </main>
 </div>
@@ -92,9 +93,11 @@
     <li>Il ne remplace ni un professionnel du droit ni le texte officiel : vérifiez toujours dans le PDF officiel. Ce n'est pas un avis juridique.</li>
   </ul>
   <h3>Vos données</h3>
-  <p>L'application ne conserve pas le texte de vos questions. Votre historique est enregistré uniquement dans votre navigateur, et vous pouvez l'effacer à tout moment.</p>
+  <p id="about-data-default">L'application ne conserve pas le texte de vos questions. Votre historique est enregistré uniquement dans votre navigateur, et vous pouvez l'effacer à tout moment.</p>
+  <p id="about-data" hidden></p>
 </aside>
 
+<script src="game.js"></script>
 <script src="app.js"></script>
 </body>
 </html>

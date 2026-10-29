@@ -2,3 +2,6 @@
 # Extends root requirements.txt without modifying the frozen baseline
 -r ../requirements.txt
 gunicorn==23.0.0
+# Web Push (notification de fin de traitement) : ECDH, HKDF, AES-GCM et ECDSA, absents de la bibliothèque standard. Facultative à l'exécution :
+# sans elle, le service fonctionne et n'annonce simplement aucune notification.
+cryptography==49.0.0

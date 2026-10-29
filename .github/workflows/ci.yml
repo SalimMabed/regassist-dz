@@ -53,6 +53,14 @@ jobs:
         run: |
           python local_app/tests/test_queue.py
 
+      - name: Run Persistent Tracking Tests
+        run: |
+          python local_app/tests/test_persist.py
+
+      - name: Run Web Push Tests
+        run: |
+          python local_app/tests/test_webpush.py
+
       - name: Run Grounding Guard Tests
         run: |
           python local_app/tests/test_grounding.py
