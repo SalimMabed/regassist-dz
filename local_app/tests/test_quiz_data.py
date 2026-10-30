@@ -99,6 +99,26 @@ def test_quiz_texts_have_no_emoji_technical_wording_or_secret_words():
     assert not re.search(r"llama|qwen|rerank|hybrid|PHASE_4|NO-GO|127\.0\.0\.1|OCR_UNCERTAIN|chunk|\bLLM\b|api[_-]?key|secret|token", json.dumps(DATA, ensure_ascii=False), re.I)
 
 
+def test_quiz_scripts_are_wired_and_follow_the_interface_contract():
+    from local_app import server
+    static = ROOT / "local_app" / "static"
+    for name in ("quiz-data.js", "quiz-logic.js", "quiz.js"):
+        assert server._PAGES.get(name) == name, f"{name} doit être servi par l'application (et par elle seule)"
+        assert (static / name).is_file()
+    html = (static / "index.html").read_text(encoding="utf-8")
+    order = [html.index(f'src="{n}"') for n in ("quiz-data.js", "quiz-logic.js", "quiz.js", "app.js")]
+    assert order == sorted(order), "données, logique et interface du quiz se chargent avant app.js"
+    assert not re.search(r"""(?:src|href)\s*=\s*["'](?:https?:)?//""", html)
+    for name in ("quiz-logic.js", "quiz.js"):
+        js = (static / name).read_text(encoding="utf-8")
+        assert not re.search("[\U0001F000-\U0001FAFF☀-➿️]", js), f"emoji dans {name}"
+        assert not re.search(r"sk-[A-Za-z0-9_-]{8,}|ANTHROPIC|api[_-]?key|secret|token", js, re.I), f"clé ou secret dans {name}"
+        literals = re.findall(r"'(?:[^'\\\n]|\\.)*'|\"(?:[^\"\\\n]|\\.)*\"", js)
+        visible = " ".join(literals)
+        assert not re.search(r"llama|qwen|rerank|hybrid|PHASE_4|NO-GO|127\.0\.0\.1|OCR_UNCERTAIN|chunk|Traçabilité|\bLLM\b|\bport\b|\bms\b", visible, re.I), f"détail technique visible dans {name}"
+        assert "RegAssistQuizLogic" in js or "RegAssistQuiz" in js
+
+
 TESTS = [(n, f) for n, f in sorted(globals().items(), key=lambda kv: kv[1].__code__.co_firstlineno if callable(kv[1]) and hasattr(kv[1], "__code__") else 0) if n.startswith("test_")]
 
 if __name__ == "__main__":

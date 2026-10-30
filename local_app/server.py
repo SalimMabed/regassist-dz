@@ -25,7 +25,8 @@ from .service import Service, ServiceError, check_environment, setup_logging, va
 CSP = ("default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src 'self'; font-src 'self'; "
        "base-uri 'none'; form-action 'none'; frame-ancestors 'none'; worker-src 'self'")
 _PAGES = {"": "index.html", "index.html": "index.html", "app.css": "app.css", "app.js": "app.js", "favicon.svg": "favicon.svg", "login.css": "login.css",
-          "game.js": "game.js", "sw.js": "sw.js"}
+          "game.js": "game.js", "sw.js": "sw.js",
+          "quiz-data.js": "quiz-data.js", "quiz-logic.js": "quiz-logic.js", "quiz.js": "quiz.js"}
 # Mode réseau seulement : ce qui reste accessible sans code d'accès (la page d'accès et ses ressources, la sonde de vie qui ne renvoie que « ok »).
 _PUBLIC_IN_LAN = {"/login", "/login.css", "/favicon.svg", "/favicon.ico", "/api/health"}
 _TICKET = re.compile(r"[A-Za-z0-9_-]{16,64}")

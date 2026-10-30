@@ -471,7 +471,7 @@
     const steps = el('ol', 'track-steps'); const items = STEPS.map((t) => { const li = el('li', 'track-step'); li.append(el('span', 'track-dot'), el('span', 'track-label', t)); steps.append(li); return li; });
     const detail = el('p', 'track-detail'); const net = el('p', 'track-net', 'Connexion interrompue : nouvelle tentative en cours. Votre question n\'est pas perdue.'); net.hidden = true;
     card.append(live, steps, detail, net);
-    const tr = { card, live, items, detail, net, q, since: null, game: null, gameOpen: false, last: '' };
+    const tr = { card, live, items, detail, net, q, since: null, acts: {}, activity: null, gameOpen: false, last: '' };
     if (persistent()) {
       card.append(el('p', 'track-note', 'Vous pouvez fermer cette page : votre question est conservée sur le serveur ' + days() + '. Gardez ce lien personnel pour la retrouver, sans le partager : il donne accès à votre question et à sa réponse.'));
       const row = el('div', 'track-link'); const input = el('input'); input.type = 'text'; input.readOnly = true; input.value = trackUrl(v.ticket); input.setAttribute('aria-label', 'Lien personnel de suivi');
@@ -486,21 +486,38 @@
     const actions = el('div', 'track-actions');
     const play = el('button', 'btn btn-ghost', 'Patienter en jouant (facultatif)'); play.type = 'button'; play.setAttribute('aria-expanded', 'false');
     const gameBox = el('div', 'track-game'); gameBox.hidden = true;
-    play.addEventListener('click', () => toggleGame(tr, play, gameBox, true));
+    tr.acts.game = { btn: play, box: gameBox, lib: 'RegAssistGame', mod: null };
+    play.addEventListener('click', () => toggleActivity(tr, 'game', true));
+    const quizBox = el('div', 'track-quiz'); quizBox.hidden = true;
+    let quizBtn = null;
+    if (window.RegAssistQuiz && window.RegAssistQuizData) {                 // le quiz est facultatif : sans ses données, seul le jeu est proposé
+      quizBtn = el('button', 'btn btn-ghost', 'Quiz sur les textes (facultatif)'); quizBtn.type = 'button'; quizBtn.setAttribute('aria-expanded', 'false');
+      tr.acts.quiz = { btn: quizBtn, box: quizBox, lib: 'RegAssistQuiz', mod: null };
+      quizBtn.addEventListener('click', () => toggleActivity(tr, 'quiz', true));
+    }
     const del = el('button', 'btn btn-link', persistent() ? 'Supprimer ma question' : 'Quitter la file d\'attente'); del.type = 'button';
     let armed = null;
     del.addEventListener('click', () => {
       if (persistent() && !armed) { del.textContent = 'Confirmer la suppression'; armed = setTimeout(() => { del.textContent = 'Supprimer ma question'; armed = null; }, 4000); return; }
       clearTimeout(armed); armed = null; leaveTrack(tr);
     });
-    actions.append(play, del); card.append(actions, gameBox); box.append(card);
+    actions.append(play); if (quizBtn) actions.append(quizBtn); actions.append(del); card.append(actions, gameBox, quizBox); box.append(card);
     $('sources').replaceChildren(el('p', 'placeholder', 'Les sources s\'afficheront avec la réponse.'));
     state.tr = tr;
   }
 
-  function toggleGame(tr, play, gameBox, open) {
-    tr.gameOpen = open; gameBox.hidden = !open; play.setAttribute('aria-expanded', String(open));
-    if (open && !tr.game && window.RegAssistGame) tr.game = window.RegAssistGame.mount(gameBox, { onBack: () => { toggleGame(tr, play, gameBox, false); play.focus(); } });
+  function toggleActivity(tr, kind, open) {           // une seule activité facultative visible à la fois (jeu ou quiz) ; chacune garde son état quand on passe de l'une à l'autre
+    for (const k of Object.keys(tr.acts)) { const on = open && k === kind; tr.acts[k].box.hidden = !on; tr.acts[k].btn.setAttribute('aria-expanded', String(on)); }
+    tr.gameOpen = open; tr.activity = open ? kind : null;
+    const a = tr.acts[kind];
+    if (open && !a.mod && window[a.lib]) {
+      const back = () => { toggleActivity(tr, kind, false); a.btn.focus(); };
+      const other = kind === 'quiz' ? tr.acts.game : tr.acts.quiz;
+      const opts = { onBack: back };
+      if (other) opts.onSwitch = () => { toggleActivity(tr, kind === 'quiz' ? 'game' : 'quiz', true); const f = other.box.querySelector('.game-card, .quiz-title'); if (f) f.focus(); };
+      a.mod = window[a.lib].mount(a.box, opts);
+    }
+    if (open && kind === 'quiz') { const h = a.box.querySelector('.quiz-title'); if (h) h.focus(); }
     if (!open && tr.onGameClose) { const f = tr.onGameClose; tr.onGameClose = null; f(); }
   }
 
@@ -577,7 +594,7 @@
         v = r.data;
       }
     } finally {
-      state.ticket = null; if (state.tr && state.tr.game) state.tr.game.destroy(); state.tr = null;
+      state.ticket = null; if (state.tr) Object.values(state.tr.acts).forEach((a) => { if (a.mod) a.mod.destroy(); }); state.tr = null;
     }
   }
 

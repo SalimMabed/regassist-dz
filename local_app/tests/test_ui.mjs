@@ -567,6 +567,202 @@ test('double envoi : un seul dépôt ; après une coupure, le nouvel essai réut
   assert.match(keys[0], /^[A-Za-z0-9_-]{16,64}$/);
 });
 
+/* ---------- quiz facultatif pendant l'attente (à côté du mini-jeu) ---------- */
+const OFFICIAL = 'https://www.bank-of-algeria.dz/';
+const openQuiz = async () => {
+  await ev(`[...document.querySelectorAll('.track-actions .btn')].find((b) => /^Quiz/.test(b.textContent)).click()`);
+  await waitFor(`!!document.querySelector('.quiz .quiz-title')`, 'quiz');
+};
+const clickQuiz = (label) => ev(`[...document.querySelectorAll('.quiz .btn')].find((b) => b.textContent === ${JSON.stringify(label)}).click()`);
+const startQuiz = async () => { await clickQuiz('Relever le défi'); await waitFor(`!!document.querySelector('.quiz-question')`, 'première question'); };
+const quizPick = (right) => ev(`(() => {                       // choisit la bonne (ou une mauvaise) réponse d'après la banque de questions chargée par la page
+  const q = window.RegAssistQuizData.questions.find((x) => x.question === document.querySelector('.quiz-question').textContent);
+  const good = q.choices[q.answer];
+  const b = [...document.querySelectorAll('.quiz-choice')].find((x) => (x.querySelector('.quiz-choice-text').textContent === good) === ${right});
+  b.click(); return { id: q.id, good, picked: b.querySelector('.quiz-choice-text').textContent };
+})()`);
+const pressKey = async (key, code, vk, text) => { for (const type of ['keyDown', 'keyUp']) await send('Input.dispatchKeyEvent', { type, key, code, windowsVirtualKeyCode: vk, nativeVirtualKeyCode: vk, ...(type === 'keyDown' && text ? { text } : {}) }); };
+
+test('quiz : proposé à côté du mini-jeu, jamais lancé seul, présentation, choix du jeu, retour au suivi sans rien perdre', async () => {
+  await fresh(URL_PERSIST);
+  await askTracked();
+  assert.equal(await count('.quiz'), 0, 'le quiz n\'est jamais lancé sans demande');
+  const labels = await ev(`[...document.querySelectorAll('.track-actions .btn')].map((b) => b.textContent)`);
+  assert.ok(/jouant/.test(labels[0]) && /^Quiz sur les textes \(facultatif\)$/.test(labels[1]), 'le jeu garde sa place, le quiz s\'ajoute : ' + labels.join(' | '));
+  await openQuiz();
+  assert.equal(await text('.quiz .quiz-title'), 'Vous nous posez une question, nous avons bien le droit de vous en poser une aussi !');
+  assert.match(await text('.quiz .quiz-sub'), /^En attendant notre réponse, testez vos connaissances sur les textes et la réglementation de la Banque d'Algérie\.$/);
+  assert.equal(await ev(`[...document.querySelectorAll('.quiz .btn')].map((b) => b.textContent).join(' | ')`), 'Relever le défi | Choisir le mini-jeu | Retour au suivi');
+  assert.equal(await text('.quiz .quiz-note'), 'Quiz à vocation pédagogique. Les réponses sont fondées sur les documents référencés et ne constituent pas un avis juridique.');
+  assert.equal(await ev(`document.activeElement.className`), 'quiz-title', 'le focus passe à la présentation du quiz');
+  assert.equal(await ev(`document.querySelectorAll('.track-actions .btn')[1].getAttribute('aria-expanded')`), 'true');
+  assert.ok((await text('.track-detail')).length > 10, 'le suivi de la demande reste affiché pendant le quiz');
+  await assertNoTechnicalDetail('quiz');
+  await clickQuiz('Choisir le mini-jeu');                                                            // le choix du mini-jeu depuis le quiz
+  await waitFor(`document.querySelectorAll('.game-card').length === 12`, 'cartes du jeu');
+  assert.equal(await ev(`document.querySelector('.track-quiz').hidden`), true);
+  assert.equal(await ev(`document.querySelectorAll('.track-actions .btn')[0].getAttribute('aria-expanded')`), 'true');
+  assert.equal(await ev(`document.querySelectorAll('.track-actions .btn')[1].getAttribute('aria-expanded')`), 'false');
+  await ev(`document.querySelectorAll('.track-actions .btn')[1].click()`);                          // retour au quiz : le jeu est mis de côté
+  await waitFor(`!document.querySelector('.track-quiz').hidden`, 'quiz de nouveau visible');
+  assert.equal(await ev(`document.querySelector('.track-game').hidden`), true);
+  await clickQuiz('Retour au suivi');
+  assert.equal(await ev(`document.querySelector('.track-quiz').hidden`), true);
+  assert.match(await ev(`document.activeElement.textContent`), /^Quiz/, 'le focus revient au bouton qui a ouvert le quiz');
+  assert.ok(await exists('.track'), 'la demande suit son cours');
+  await answered();
+  assert.equal(await count('.quiz'), 0, 'le quiz disparaît avec le suivi');
+});
+
+test('quiz : 5 questions, correction immédiate, explication, source avec lien officiel, score, recommencer, meilleur résultat conservé', async () => {
+  await fresh(URL_PERSIST);
+  await askTracked();
+  await openQuiz();
+  const before = B.requests.length;
+  await startQuiz();
+  const seen = [];
+  for (let i = 1; i <= 5; i++) {
+    assert.equal(await text('.quiz-step'), `Question ${i} sur 5`);
+    assert.equal(await ev(`document.querySelector('.quiz-progress').getAttribute('aria-valuenow')`), String(i));
+    assert.equal(await count('.quiz-seg'), 5);
+    assert.ok([3, 4].includes(await count('.quiz-choice')), '3 ou 4 réponses');
+    assert.equal(await ev(`document.querySelector('.quiz-feedback').hidden && document.querySelector('.quiz-actions .btn-primary').hidden`), true, 'ni correction ni bouton suivant avant la réponse');
+    const right = i <= 3;                                                                              // 3 bonnes réponses puis 2 mauvaises
+    const p = await quizPick(right); seen.push(p.id);
+    const v = await text('.quiz-verdict');
+    assert.ok(right ? v === 'Bonne réponse !' : v === 'Réponse incorrecte. La bonne réponse était : ' + p.good, v);
+    assert.ok((await text('.quiz-explain')).length > 20, 'explication');
+    assert.equal(await count('.quiz-choice.is-correct'), 1); assert.equal(await count('.quiz-choice.is-wrong'), right ? 0 : 1);
+    assert.equal(await ev(`[...document.querySelectorAll('.quiz-choice')].every((b) => b.getAttribute('aria-disabled') === 'true')`), true);
+    assert.match(await text('.quiz-choice.is-correct .quiz-choice-status'), right ? /^Bonne réponse, c'est la vôtre$/ : /^Bonne réponse$/);
+    if (!right) assert.equal(await text('.quiz-choice.is-wrong .quiz-choice-status'), 'Votre réponse : incorrecte');
+    const src = await ev(`({ href: document.querySelector('.quiz-source-link').href, rel: document.querySelector('.quiz-source-link').rel, target: document.querySelector('.quiz-source-link').target,
+      title: document.querySelector('.quiz-source-title').textContent, ref: document.querySelector('.quiz-source-ref').textContent, quote: document.querySelector('.quiz-quote').textContent })`);
+    assert.ok(src.href.startsWith(OFFICIAL) && /noopener/.test(src.rel) && src.target === '_blank', 'lien vers le document officiel : ' + src.href);
+    assert.ok(src.title.length > 10 && /page \d+ du PDF/.test(src.ref) && src.quote.length > 14, JSON.stringify(src));
+    await ev(`document.querySelector('.quiz-choice:not(.is-correct):not(.is-wrong)').click()`);          // un second clic ne change rien
+    assert.equal(await text('.quiz-verdict'), v, 'la réponse donnée ne peut plus être modifiée');
+    await clickQuiz(i < 5 ? 'Question suivante' : 'Voir mon résultat');
+  }
+  assert.equal(new Set(seen).size, 5, 'cinq questions différentes');
+  await waitFor(`!!document.querySelector('.quiz-score')`, 'écran de résultat');
+  assert.equal(await text('.quiz-score'), '3 sur 5');
+  assert.equal(await text('.quiz-message'), 'Pas mal ! Il reste quelques textes à découvrir.');
+  const facts = await text('.quiz-facts');
+  assert.ok(facts.includes('Bonnes réponses : 3') && facts.includes('Questions répondues : 5 sur 5') && facts.includes('Meilleur résultat : 3 sur 5 (nouveau meilleur résultat)'), facts);
+  assert.deepEqual(await ev(`JSON.parse(localStorage.getItem('regassist.quiz.best.v1'))`), { correct: 3, total: 5 });
+  assert.equal(await ev(`[...document.querySelectorAll('.quiz .btn')].map((b) => b.textContent).join(' | ')`), 'Recommencer | Choisir le mini-jeu | Retour au suivi');
+  await clickQuiz('Recommencer');
+  await waitFor(`document.querySelector('.quiz-step') && document.querySelector('.quiz-step').textContent === 'Question 1 sur 5'`, 'nouvelle série');
+  assert.equal(await count('.quiz-score'), 0);
+  const quiz = B.requests.slice(before).filter((u) => !/\/api\/queue\/[A-Za-z0-9_-]+$/.test(u) && !u.endsWith('/api/status'));
+  assert.deepEqual(quiz, [], 'le quiz ne fait aucune requête (hors suivi de la question) : ' + quiz.join(', '));
+  await ev('location.reload()');                                                                      // le meilleur résultat survit au rechargement, local au navigateur
+  await waitFor(`!!document.querySelector('.track')`, 'suivi après rechargement');
+  await openQuiz();
+  assert.equal(await text('.quiz .quiz-best'), 'Votre meilleur résultat : 3 sur 5.');
+  await clickQuiz('Retour au suivi');                                                                 // quiz fermé : la réponse s'affiche directement (ouvert, un bandeau inviterait à la lire)
+  await answered();
+});
+
+test('quiz : aucun envoi au serveur, aucun appel au moteur de réponse, aucune réponse de l\'utilisateur conservée', async () => {
+  await fresh(URL_PERSIST);
+  await askTracked();
+  await ev(`window.__net = []; window.__f = window.fetch; window.fetch = (u, i) => { window.__net.push(((i && i.method) || 'GET') + ' ' + u); return window.__f(u, i); };
+    window.__x = XMLHttpRequest.prototype.send; XMLHttpRequest.prototype.send = function () { window.__net.push('XHR'); return window.__x.apply(this, arguments); };
+    window.__b = navigator.sendBeacon; navigator.sendBeacon = function () { window.__net.push('BEACON'); return true; };`);
+  await openQuiz(); await startQuiz();
+  for (let i = 1; i <= 5; i++) { await quizPick(i % 2 === 1); await clickQuiz(i < 5 ? 'Question suivante' : 'Voir mon résultat'); }
+  await waitFor(`!!document.querySelector('.quiz-score')`, 'résultat');
+  const net = await ev('window.__net');
+  assert.deepEqual(net.filter((n) => !/^GET \/api\/queue\/[A-Za-z0-9_-]+$/.test(n) && n !== 'GET /api/status'), [], 'requêtes émises pendant le quiz : ' + net.join(', '));
+  assert.equal(net.filter((n) => /\/api\/chat|POST/.test(n)).length, 0, 'aucun appel au moteur de réponse ni dépôt de question');
+  const stored = await ev(`Object.keys(localStorage).filter((k) => /quiz/.test(k)).map((k) => k + '=' + localStorage.getItem(k)).join(' ; ')`);
+  assert.ok(/^regassist\.quiz\.(?:best|seen)\.v1=/.test(stored) && !/"answers"|"picks"|choix|réponse/i.test(stored), 'seuls le meilleur score et les identifiants des questions vues sont gardés : ' + stored);
+  await clickQuiz('Retour au suivi');
+  await answered();
+});
+
+test('quiz : clavier (Tab, Entrée), annonces pour lecteur d\'écran, nom accessible, correction non limitée à la couleur', async () => {
+  await fresh(URL_PERSIST);
+  await askTracked();
+  await openQuiz();
+  await ev(`[...document.querySelectorAll('.quiz .btn')].find((b) => b.textContent === 'Relever le défi').focus()`);
+  await pressKey('Enter', 'Enter', 13, '\r');                                                          // démarrage au clavier
+  await waitFor(`!!document.querySelector('.quiz-question')`, 'question au clavier');
+  assert.equal(await ev(`document.activeElement.className.includes('quiz-question')`), true, 'le focus suit la question');
+  assert.equal(await ev(`document.querySelector('.quiz-progress').getAttribute('role')`), 'progressbar');
+  assert.equal(await ev(`document.querySelector('.quiz-progress').getAttribute('aria-valuetext')`), 'Question 1 sur 5');
+  assert.equal(await ev(`document.querySelector('.quiz-choices').getAttribute('aria-labelledby') === document.querySelector('.quiz-question').id`), true, 'le groupe de réponses est nommé par la question');
+  assert.equal(await ev(`[...document.querySelectorAll('.quiz-choice')].every((b) => b.tagName === 'BUTTON' && b.type === 'button' && b.tabIndex === 0 && b.textContent.trim().length > 2)`), true);
+  await waitFor(`/^Question 1 sur 5\. /.test(document.querySelector('.quiz [role="status"].sr-only').textContent)`, 'annonce de la question');
+  await ev(`document.querySelectorAll('.quiz-choice')[1].focus()`);
+  await pressKey('Enter', 'Enter', 13, '\r');                                                          // réponse au clavier
+  await waitFor(`!!document.querySelector('.quiz-verdict')`, 'correction au clavier');
+  await waitFor(`/^(Bonne réponse\. |Réponse incorrecte\. La bonne réponse était : )/.test(document.querySelector('.quiz [role="status"].sr-only').textContent)`, 'annonce de la correction');
+  const styles = await ev(`({ correct: getComputedStyle(document.querySelector('.quiz-choice.is-correct')).borderTopStyle, status: document.querySelector('.quiz-choice.is-correct').textContent.includes('Bonne réponse'),
+    wrong: document.querySelector('.quiz-choice.is-wrong') ? getComputedStyle(document.querySelector('.quiz-choice.is-wrong')).borderTopStyle : 'dashed', wrongText: document.querySelector('.quiz-choice.is-wrong') ? document.querySelector('.quiz-choice.is-wrong').textContent.includes('incorrecte') : true })`);
+  assert.equal(styles.status, true, 'la bonne réponse est dite en toutes lettres'); assert.equal(styles.wrongText, true);
+  assert.notEqual(styles.correct, styles.wrong, 'bonne et mauvaise réponse se distinguent aussi par le trait de bordure, pas seulement par la couleur');
+  await ev(`[...document.querySelectorAll('.quiz .btn')].find((b) => b.textContent === 'Question suivante').focus()`);
+  await pressKey('Enter', 'Enter', 13, '\r');
+  await waitFor(`document.querySelector('.quiz-step') && document.querySelector('.quiz-step').textContent === 'Question 2 sur 5'`, 'question suivante au clavier');
+  assert.equal(await ev(`document.activeElement.className.includes('quiz-question')`), true, 'le focus passe à la nouvelle question');
+  await clickQuiz('Retour au suivi');
+  await answered();
+});
+
+test('quiz : reprise là où on s\'était arrêté, mouvement réduit respecté', async () => {
+  const media = (v) => send('Emulation.setEmulatedMedia', { features: [{ name: 'prefers-reduced-motion', value: v }] });
+  try {
+    await media('reduce'); await fresh(URL_PERSIST);
+    await askTracked(); await openQuiz(); await startQuiz();
+    assert.equal(await ev(`getComputedStyle(document.querySelector('.quiz-enter')).animationName`), 'none', 'aucune animation si le mouvement est réduit');
+    const first = await quizPick(true);
+    await clickQuiz('Retour au suivi');                                                                // quitter à tout moment
+    assert.equal(await ev(`document.querySelector('.track-quiz').hidden`), true); assert.ok(await exists('.track-detail'));
+    await openQuiz();
+    assert.equal(await text('.quiz-verdict'), 'Bonne réponse !', 'on retrouve la question là où on l\'avait laissée : ' + first.id);
+    await media('no-preference');
+    await clickQuiz('Question suivante');
+    assert.equal(await ev(`getComputedStyle(document.querySelector('.quiz-enter')).animationName`), 'quiz-in', 'transition discrète sans préférence de mouvement réduit');
+    await clickQuiz('Retour au suivi');
+    await answered();
+  } finally { await send('Emulation.setEmulatedMedia', { features: [] }); }
+});
+
+test('réponse prête pendant le quiz : un bandeau invite à la lire, le quiz n\'est pas interrompu', async () => {
+  await fresh(URL_PERSIST);
+  await askTracked(); await openQuiz(); await startQuiz();
+  await quizPick(true);
+  await waitFor(`!!document.querySelector('.track-ready')`, 'bandeau « réponse prête »', 40000);
+  assert.equal(await count('.quiz'), 1, 'le quiz continue');
+  assert.equal(await exists('.quiz-verdict'), true, 'la correction reste affichée');
+  assert.equal(await exists('#answer .ans-text'), false, 'la réponse ne remplace pas le quiz sans l\'accord du lecteur');
+  await ev(`document.querySelector('.track-ready .btn').click()`);
+  await answered();
+  assert.equal(await count('.quiz'), 0);
+});
+
+test('téléphone (375 px) : quiz sans défilement horizontal, réponses faciles à toucher, source lisible', async () => {
+  await send('Emulation.setDeviceMetricsOverride', { width: 375, height: 812, deviceScaleFactor: 1, mobile: true });
+  try {
+    await fresh(URL_PERSIST);
+    await askTracked(); await openQuiz(); await startQuiz();
+    const m = await ev(`({ sw: document.documentElement.scrollWidth, iw: window.innerWidth, min: Math.min(...[...document.querySelectorAll('.quiz-choice')].map((b) => Math.round(b.getBoundingClientRect().height))),
+      wide: Math.min(...[...document.querySelectorAll('.quiz-choice')].map((b) => Math.round(b.getBoundingClientRect().width))) })`);
+    assert.ok(m.sw <= m.iw + 1, `défilement horizontal : ${m.sw} > ${m.iw}`);
+    assert.ok(m.min >= 44, 'cible tactile trop petite : ' + m.min); assert.ok(m.wide >= 200, 'réponse trop étroite : ' + m.wide);
+    await quizPick(false);
+    const after = await ev(`({ sw: document.documentElement.scrollWidth, iw: window.innerWidth, link: Math.round(document.querySelector('.quiz-source-link').getBoundingClientRect().width), quote: Math.round(document.querySelector('.quiz-quote').getBoundingClientRect().width),
+      btn: Math.round(document.querySelector('.quiz-actions .btn-primary').getBoundingClientRect().height) })`);
+    assert.ok(after.sw <= after.iw + 1, `défilement horizontal après la réponse : ${after.sw} > ${after.iw}`);
+    assert.ok(after.quote > 150 && after.link > 100 && after.btn >= 44, JSON.stringify(after));
+    await waitFor(`!!document.querySelector('.track-ready')`, 'bandeau « réponse prête » pendant le quiz', 40000);
+    await ev(`document.querySelector('.track-ready .btn').click()`);
+    await answered();
+  } finally { await send('Emulation.clearDeviceMetricsOverride'); }
+});
 
 test('aucune ressource externe : toutes les requêtes du navigateur visent l\'application, aucune violation CSP, aucune exception', async () => {
   const foreign = requests.filter((u) => !(u.startsWith(ORIGIN + '/') || (URL_OFF && u.startsWith(new URL(URL_OFF).origin + '/')) || (URL_PERSIST && u.startsWith(new URL(URL_PERSIST).origin + '/')) || u.startsWith('data:') || u === 'about:blank'));
