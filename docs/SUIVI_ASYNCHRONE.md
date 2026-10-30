@@ -30,6 +30,7 @@ Trois pistes étudiées : **mémoire de paires**, séquence à reproduire (type 
 * Proposé par un bouton discret « Patienter en jouant (facultatif) » ; jamais lancé seul.
 * Coups, temps, meilleur résultat (gardé dans ce navigateur), rejouer, « Retour au suivi » (le focus revient au bouton).
 * Aucune requête réseau ; il vit dans son cadre et n'agit ni sur la question ni sur sa réponse.
+* Un **quiz facultatif** sur les textes de la Banque d'Algérie complète le jeu dans le même espace (questions vérifiées dans le corpus, chacune avec sa source et le lien vers le PDF officiel) : voir `docs/QUIZ_ATTENTE.md`.
 * Si la réponse arrive pendant une partie, **la partie n'est pas interrompue** : un bandeau « Votre réponse est prête » invite à la lire.
 * `prefers-reduced-motion` respecté (aucune animation), cibles ≥ 44 px sur téléphone.
 
