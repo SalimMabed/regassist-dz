@@ -75,7 +75,7 @@
         const f = footer(card, true); f.finish(); return;
       }
       card.append(el('p', 'quiz-sub', 'En attendant notre réponse, testez vos connaissances sur les textes et la réglementation de la Banque d\'Algérie.'));
-      card.append(el('p', 'quiz-meta', Math.min(L.SESSION_SIZE, bank.length) + ' questions, sans chronomètre. Chaque réponse est expliquée et renvoie au texte officiel.'));
+      card.append(el('p', 'quiz-meta', Math.min(L.SESSION_SIZE, bank.length) + ' questions simples, sans chronomètre. Chaque réponse est expliquée, avec sa source.'));
       const best = L.loadBest(storage);
       if (best) card.append(el('p', 'quiz-meta quiz-best', 'Votre meilleur résultat : ' + score(best.correct, best.total) + '.'));
       const go = button('Relever le défi', 'btn btn-primary'); go.addEventListener('click', start);

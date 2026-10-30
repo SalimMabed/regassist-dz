@@ -32,7 +32,7 @@
     UNKNOWN: ['Vigueur non déterminée', 'warn'],
   };
 
-  const state = { status: null, reachable: false, checked: false, busy: false, conv: null, convs: [], entry: null, storageOk: true, timer: null, maxQ: DEFAULT_MAX_Q };
+  const state = { status: null, reachable: false, checked: false, busy: false, conv: null, convs: [], entry: null, storageOk: true, timer: null, maxQ: DEFAULT_MAX_Q, play: null, offerTr: null };
 
   /* ---------- utilitaires ---------- */
   const safeUrl = (u) => (typeof u === 'string' && /^https?:\/\//i.test(u) ? u : null);
@@ -131,24 +131,47 @@
     if (open) $('btn-new').focus(); else if (document.activeElement && $('history').contains(document.activeElement)) $('btn-menu').focus();
   }
 
-  /* ---------- choix proposé dès l'envoi d'une question : quiz, jeu, ou simplement attendre ---------- */
+  /* ---------- fenêtre proposée dès l'envoi d'une question : quiz, jeu, ou simplement attendre.
+     Une fois l'activité choisie, la même fenêtre s'agrandit et sert de scène de jeu ; la progression de la demande reste visible en bas. ---------- */
+  const offerPanel = () => $('offer').querySelector('.offer-panel');
+  function offerView(kind) {                         // sans argument : le choix ; 'quiz' ou 'game' : la scène de jeu agrandie
+    const playing = !!kind;
+    offerPanel().classList.toggle('is-playing', playing);
+    $('offer-choose').hidden = playing; $('offer-play').hidden = !playing;
+    offerPanel().setAttribute('aria-labelledby', playing ? 'offer-play-title' : 'offer-title');
+    if (playing) {
+      $('offer-play-name').textContent = kind === 'quiz' ? 'Quiz' : 'Jeu de mémoire';
+      for (const e of $('offer').querySelectorAll('.offer-play-emoji')) e.hidden = e.dataset.kind !== kind;
+    }
+  }
   function offerClose(restoreFocus) {
     const box = $('offer'); if (box.hidden) return;
-    box.hidden = true; state.offerTr = null;
+    if (state.play) toggleActivity(state.play.tr, state.play.kind, false);     // referme l'activité : sa boîte retourne dans la fiche de suivi, avec son état
+    else { box.hidden = true; state.offerTr = null; }
     if (restoreFocus) { const a = $('answer'); a.tabIndex = -1; a.focus({ preventScroll: true }); }
   }
   function offerOpen(tr) {                           // seulement quand la fiche de suivi propose bien le quiz et/ou le jeu
     if (!tr || !(tr.acts.quiz || tr.acts.game)) return;
-    state.offerTr = tr;
+    state.offerTr = tr; offerView(null);
     $('offer-quiz').hidden = !tr.acts.quiz; $('offer-game').hidden = !tr.acts.game;
-    $('offer').hidden = false; $('offer').querySelector('.offer-panel').focus();
+    $('offer').hidden = false; offerPanel().focus();
   }
-  function offerChoose(kind) { const tr = state.offerTr; offerClose(false); if (tr && tr.acts[kind]) toggleActivity(tr, kind, true); }
+  function offerChoose(kind) { const tr = state.offerTr; if (tr && tr.acts[kind]) toggleActivity(tr, kind, true); }
+  function playEnter(tr, kind) {                     // les boîtes du quiz et du jeu (avec leur état) passent dans la fenêtre ; une seule est visible à la fois
+    const stage = $('offer-stage');
+    for (const a of Object.values(tr.acts)) if (a.box.parentNode !== stage) stage.append(a.box);
+    state.play = { tr, kind }; state.offerTr = null; offerView(kind); $('offer').hidden = false; stage.scrollTop = 0;
+  }
+  function playLeave(tr) {
+    if (!state.play || state.play.tr !== tr) return;
+    for (const a of Object.values(tr.acts)) tr.card.append(a.box);
+    state.play = null; offerView(null); $('offer').hidden = true;
+  }
   function offerKeys(ev) {                           // le focus reste dans la fenêtre tant qu'elle est ouverte
     if (ev.key !== 'Tab') return;
-    const items = [...$('offer').querySelectorAll('button')].filter((b) => !b.hidden); if (!items.length) return;
+    const items = [...$('offer').querySelectorAll('button:not([disabled]), [tabindex="0"]')].filter((b) => b.offsetParent !== null); if (!items.length) return;
     const first = items[0], last = items[items.length - 1], on = document.activeElement;
-    if (ev.shiftKey && (on === first || on === $('offer').querySelector('.offer-panel'))) { ev.preventDefault(); last.focus(); }
+    if (ev.shiftKey && (on === first || on === offerPanel())) { ev.preventDefault(); last.focus(); }
     else if (!ev.shiftKey && on === last) { ev.preventDefault(); first.focus(); }
   }
 
@@ -587,8 +610,7 @@
     state.tr = tr;
   }
 
-  function toggleActivity(tr, kind, open) {           // une seule activité facultative visible à la fois (jeu ou quiz) ; chacune garde son état quand on passe de l'une à l'autre
-    if (open) offerClose(false);                      // choisir une activité (depuis la fenêtre de choix ou la fiche de suivi) referme la fenêtre de choix
+  function toggleActivity(tr, kind, open) {           // une seule activité facultative visible à la fois (jeu ou quiz), dans la fenêtre agrandie ; chacune garde son état quand on passe de l'une à l'autre
     for (const k of Object.keys(tr.acts)) { const on = open && k === kind; tr.acts[k].box.hidden = !on; tr.acts[k].btn.setAttribute('aria-expanded', String(on)); }
     tr.gameOpen = open; tr.activity = open ? kind : null;
     const a = tr.acts[kind];
@@ -599,7 +621,9 @@
       if (other) opts.onSwitch = () => { toggleActivity(tr, kind === 'quiz' ? 'game' : 'quiz', true); const f = other.box.querySelector('.game-card, .quiz-title'); if (f) f.focus(); };
       a.mod = window[a.lib].mount(a.box, opts);
     }
+    if (open) playEnter(tr, kind); else playLeave(tr);
     if (open && kind === 'quiz') { const h = a.box.querySelector('.quiz-title'); if (h) h.focus(); }
+    else if (open) { const f = a.box.querySelector('.game-card'); if (f) f.focus(); }
     if (!open && tr.onGameClose) { const f = tr.onGameClose; tr.onGameClose = null; f(); }
   }
 
@@ -617,8 +641,10 @@
       t.detail.textContent = 'Votre question est en cours de traitement depuis ' + fmtDur(Math.round((Date.now() - t.since) / 1000)) + '. La durée n\'est pas connue à l\'avance.';
       announce = 'C\'est votre tour : votre question est en cours de traitement.';
     }
+    [...$('offer-progress').querySelectorAll('.offer-prog-bar i')].forEach((seg, i) => { seg.classList.toggle('is-done', i < idx); seg.classList.toggle('is-current', i === idx); });
+    $('offer-prog-step').textContent = 'Étape ' + (idx + 1) + ' sur ' + STEPS.length + ' · ' + STEPS[idx]; $('offer-prog-detail').textContent = t.detail.textContent;
     const key = v.state + ':' + (v.position || 0);
-    if (key !== t.last) { t.live.textContent = announce; t.last = key; }
+    if (key !== t.last) { t.live.textContent = announce; $('offer-prog-live').textContent = announce; t.last = key; }
   }
 
   async function leaveTrack(tr) {                   // quitter la file (file en mémoire) ou supprimer la question (file persistante)
@@ -640,7 +666,12 @@
     const t = state.tr; if (!t || !t.gameOpen) return Promise.resolve();
     return new Promise((resolve) => {
       const b = el('div', 'track-ready'); b.setAttribute('role', 'status'); const btn = el('button', 'btn btn-primary', 'Lire la réponse'); btn.type = 'button';
-      b.append(el('span', null, 'Votre réponse est prête.'), btn); t.card.prepend(b);
+      b.append(el('span', null, 'Votre réponse est prête.'), btn);
+      if (state.play) {                               // la fenêtre de jeu est ouverte : le bandeau y remplace la progression
+        [...$('offer-progress').querySelectorAll('.offer-prog-bar i')].forEach((seg) => { seg.classList.add('is-done'); seg.classList.remove('is-current'); });
+        $('offer-prog-step').textContent = 'Étape ' + STEPS.length + ' sur ' + STEPS.length + ' · ' + STEPS[STEPS.length - 1]; $('offer-prog-detail').textContent = '';
+        $('offer-progress').append(b);
+      } else t.card.prepend(b);
       btn.addEventListener('click', () => { t.onGameClose = null; resolve(); });
       t.onGameClose = resolve;
     });
@@ -656,7 +687,7 @@
     let fails = 0; let offered = false;
     try {
       while (true) {
-        if (v.state === 'done') { offerClose(false); flagTitle(); await waitForReader(); return v; }
+        if (v.state === 'done') { if (!state.play) offerClose(false); flagTitle(); await waitForReader(); return v; }
         if (v.state === 'error') { renderError((v.error && v.error.message) || 'La question n\'a pas pu être traitée.'); return null; }
         if (state.cancelled) { afterLeave(); return null; }
         updateTrack(v, q);
@@ -804,6 +835,7 @@
     $('offer-quiz').addEventListener('click', () => offerChoose('quiz'));
     $('offer-game').addEventListener('click', () => offerChoose('game'));
     $('offer-none').addEventListener('click', () => offerClose(true));
+    $('offer-close').addEventListener('click', () => { const p = state.play; if (!p) return; toggleActivity(p.tr, p.kind, false); p.tr.acts[p.kind].btn.focus(); });
     $('offer').addEventListener('keydown', offerKeys);
     document.addEventListener('keydown', (ev) => {
       if (ev.key !== 'Escape') return;

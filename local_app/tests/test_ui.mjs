@@ -569,9 +569,10 @@ test('double envoi : un seul dépôt ; après une coupure, le nouvel essai réut
 
 /* ---------- quiz facultatif pendant l'attente (à côté du mini-jeu) ---------- */
 const OFFICIAL = 'https://www.bank-of-algeria.dz/';
+const settle = () => waitFor(`document.getAnimations().every((a) => a.playState !== 'running' || (a.effect && a.effect.getComputedTiming().iterations === Infinity))`, 'animations terminées');
 const openQuiz = async () => {
   await ev(`[...document.querySelectorAll('.track-actions .btn')].find((b) => /^Quiz/.test(b.textContent)).click()`);
-  await waitFor(`!!document.querySelector('.quiz .quiz-title')`, 'quiz');
+  await waitFor(`!!document.querySelector('.quiz .quiz-title')`, 'quiz'); await settle();
 };
 const clickQuiz = (label) => ev(`[...document.querySelectorAll('.quiz .btn')].find((b) => b.textContent === ${JSON.stringify(label)}).click()`);
 const startQuiz = async () => { await clickQuiz('Relever le défi'); await waitFor(`!!document.querySelector('.quiz-question')`, 'première question'); };
@@ -625,7 +626,7 @@ test('quiz : 5 questions, correction immédiate, explication, source avec lien o
     assert.equal(await text('.quiz-step'), `Question ${i} sur 5`);
     assert.equal(await ev(`document.querySelector('.quiz-progress').getAttribute('aria-valuenow')`), String(i));
     assert.equal(await count('.quiz-seg'), 5);
-    assert.ok([3, 4].includes(await count('.quiz-choice')), '3 ou 4 réponses');
+    assert.ok([2, 3].includes(await count('.quiz-choice')), '2 ou 3 réponses : des questions très simples');
     assert.equal(await ev(`document.querySelector('.quiz-feedback').hidden && document.querySelector('.quiz-actions .btn-primary').hidden`), true, 'ni correction ni bouton suivant avant la réponse');
     const right = i <= 3;                                                                              // 3 bonnes réponses puis 2 mauvaises
     const p = await quizPick(right); seen.push(p.id);
@@ -645,7 +646,7 @@ test('quiz : 5 questions, correction immédiate, explication, source avec lien o
       assert.ok(src.link && src.href.startsWith(OFFICIAL) && /noopener/.test(src.rel) && src.target === '_blank', 'lien vers le document officiel : ' + src.href);
       assert.ok(src.title.length > 10 && /page \d+ du PDF/.test(src.ref) && src.quote.length > 14, JSON.stringify(src));
     }
-    await ev(`document.querySelector('.quiz-choice:not(.is-correct):not(.is-wrong)').click()`);          // un second clic ne change rien
+    await ev(`(document.querySelector('.quiz-choice:not(.is-correct):not(.is-wrong)') || document.querySelector('.quiz-choice')).click()`);          // un second clic ne change rien
     assert.equal(await text('.quiz-verdict'), v, 'la réponse donnée ne peut plus être modifiée');
     await clickQuiz(i < 5 ? 'Question suivante' : 'Voir mon résultat');
   }
@@ -909,7 +910,7 @@ const offerHidden = () => ev(`document.getElementById('offer').hidden`);
 const pause = (ms) => new Promise((r) => setTimeout(r, ms));
 const watchOffer = () => ev(`(() => { const o = document.getElementById('offer'); window.__offerSeen = !o.hidden; new MutationObserver(() => { if (!o.hidden) window.__offerSeen = true; }).observe(o, { attributes: true, attributeFilter: ['hidden'] }); })()`);
 const offerGeometry = () => ev(`(() => { const r = (s) => { const b = document.querySelector(s).getBoundingClientRect(); return { l: b.left, t: b.top, r: b.right, b: b.bottom, w: b.width, h: b.height }; }; const fs = (s) => parseFloat(getComputedStyle(document.querySelector(s)).fontSize);
-  return { panel: r('#offer .offer-panel'), q: r('#offer-quiz'), g: r('#offer-game'), none: r('#offer-none'), title: fs('#offer-title'), lead: fs('#offer .offer-lead'), iw: innerWidth, vh: window.visualViewport.height, sw: document.documentElement.scrollWidth, overlay: r('#offer') }; })()`);
+  return { panel: r('#offer .offer-panel'), q: r('#offer-quiz'), g: r('#offer-game'), none: r('#offer-none'), title: fs('#offer-title'), lead: fs('#offer .offer-lead'), iw: innerWidth, vh: window.visualViewport.height, sw: document.documentElement.scrollWidth, overlay: r('#offer'), panelW: document.querySelector('#offer .offer-panel').offsetWidth }; })()`);
 
 test('fenêtre de choix : dès l\'envoi, en grand, avec le quiz (🧠), le jeu (🎮) et « Aucun des deux, juste attendre » en bas', async () => {
   await fresh(URL_PERSIST);
@@ -934,7 +935,7 @@ test('fenêtre de choix : dès l\'envoi, en grand, avec le quiz (🧠), le jeu (
   assert.equal(await ev(`document.getElementById('offer').contains(document.elementFromPoint(6, 400))`), true, 'la page derrière n\'est pas utilisable tant que la fenêtre est ouverte');
   assert.equal(await ev(`(() => { const b = document.getElementById('btn-send').getBoundingClientRect(); return document.getElementById('offer').contains(document.elementFromPoint(b.left + 5, b.top + 5)); })()`), true, 'le bouton d\'envoi est lui aussi recouvert');
   assert.doesNotMatch(await text('#offer'), TECH, 'aucun détail technique');
-  assert.equal(await text('#offer-quiz .offer-desc'), 'Cinq questions sur les textes de la Banque d\'Algérie et sur cet assistant.');
+  assert.equal(await text('#offer-quiz .offer-desc'), 'Cinq questions très simples sur la monnaie, la Banque d\'Algérie et cet assistant.');
   assert.equal(await text('#offer-game .offer-desc'), 'Un petit jeu de mémoire, pour passer le temps.');
 });
 
@@ -949,27 +950,110 @@ test('fenêtre de choix : le clavier reste dans la fenêtre (Tab et Maj+Tab bouc
   assert.equal(await key(true), 'offer-none', 'Maj+Tab depuis la fenêtre elle-même ne sort pas non plus');
 });
 
-test('fenêtre de choix : « Répondre à un quiz » ouvre le quiz, « Jouer à un jeu » ouvre le jeu ; la fenêtre se referme et le suivi continue', async () => {
+test('fenêtre de jeu : le choix agrandit la fenêtre ; le quiz s\'y joue ; la progression de la demande reste en bas ; « Fermer » rend la main sans rien perdre', async () => {
+  await fresh(URL_PERSIST);
+  await askTracked('plafond LENTE'); await waitOffer();                               // question lente : la réponse n'arrive pas pendant le test
+  const before = await offerGeometry();
+  await ev(`document.getElementById('offer-quiz').click()`);
+  await waitFor(`!!document.querySelector('#offer-stage .quiz .quiz-title')`, 'quiz dans la fenêtre'); await settle();
+  assert.equal(await offerHidden(), false, 'la fenêtre reste ouverte : elle sert de scène de jeu');
+  assert.equal(await ev(`document.querySelector('#offer .offer-panel').classList.contains('is-playing') && document.getElementById('offer-choose').hidden && !document.getElementById('offer-play').hidden`), true);
+  const g = await offerGeometry();
+  assert.ok(g.panelW >= before.panelW + 100, `la fenêtre s'agrandit : ${before.panelW} → ${g.panelW} px`);
+  assert.equal(await text('#offer-play-name'), 'Quiz');
+  assert.equal(await ev(`document.querySelector('.offer-play-emoji:not([hidden])').textContent`), '🧠');
+  assert.equal(await ev(`document.querySelector('#offer .offer-panel').getAttribute('aria-labelledby')`), 'offer-play-title');
+  assert.equal(await ev(`document.activeElement.className`), 'quiz-title', 'le focus est sur la présentation du quiz');
+  assert.equal(await ev(`document.querySelectorAll('.track-actions .btn')[1].getAttribute('aria-expanded')`), 'true');
+  const pr = await rect('#offer-progress'), st = await rect('#offer-stage'), pn = await rect('#offer .offer-panel');            // la progression de la demande est collée au bas de la fenêtre, sous la zone de jeu
+  assert.ok(pr.t >= st.b - 1 && Math.abs(pr.b - pn.b) <= 8, `progression en bas : ${JSON.stringify({ progTop: pr.t, stageBottom: st.b, progBottom: pr.b, panelBottom: pn.b })}`);
+  assert.match(await text('#offer-prog-step'), /^Étape [23] sur 4 · (En attente|En cours) de traitement$/);
+  assert.ok((await text('#offer-prog-detail')).length > 10, 'le détail de la demande (position, attente ou durée) est affiché');
+  assert.equal(await count('#offer-progress .offer-prog-bar i'), 4);
+  assert.equal(await ev(`document.querySelectorAll('#offer-progress .offer-prog-bar i.is-done').length >= 1 && document.querySelectorAll('#offer-progress .offer-prog-bar i.is-current').length === 1`), true);
+  await assertNoTechnicalDetail('fenêtre de jeu');
+  await clickQuiz('Choisir le mini-jeu');                                            // de la présentation du quiz au jeu, dans la même fenêtre
+  await waitFor(`document.querySelectorAll('#offer-stage .game-card').length === 12`, 'jeu dans la fenêtre');
+  assert.equal(await text('#offer-play-name'), 'Jeu de mémoire');
+  assert.equal(await ev(`document.querySelector('.offer-play-emoji:not([hidden])').textContent`), '🎮');
+  assert.equal(await ev(`document.querySelector('.track-quiz').hidden`), true, 'un seul des deux à la fois');
+  assert.equal(await offerHidden(), false);
+  await ev(`[...document.querySelectorAll('#offer-stage .game .btn')].find((b) => b.textContent === 'Retour au suivi').click()`);              // « Retour au suivi » du jeu referme la fenêtre
+  assert.equal(await offerHidden(), true);
+  assert.equal(await ev(`document.activeElement === document.querySelectorAll('.track-actions .btn')[0]`), true, 'le focus revient au bouton du jeu');
+  await ev(`document.querySelectorAll('.track-actions .btn')[1].click()`);            // le bouton du quiz dans la fiche rouvre la fenêtre
+  await waitFor(`!document.getElementById('offer').hidden && !!document.querySelector('#offer-stage .quiz .quiz-title')`, 'quiz rouvert dans la fenêtre');
+  assert.equal(await text('#offer-play-name'), 'Quiz');
+  await startQuiz(); await quizPick(true);                                           // le quiz se joue dans la fenêtre
+  assert.match(await text('.quiz-verdict'), /Bonne réponse/);
+  await ev(`document.getElementById('offer-close').click()`);                         // Fermer : la fenêtre se ferme, le quiz retourne dans la fiche de suivi avec son état
+  assert.equal(await offerHidden(), true);
+  assert.equal(await ev(`!!document.querySelector('.track .track-quiz .quiz-verdict') && document.querySelector('.track-quiz').hidden`), true, 'le quiz est rangé dans la fiche, correction comprise');
+  assert.equal(await ev(`document.activeElement === document.querySelectorAll('.track-actions .btn')[1]`), true, 'le focus revient au bouton du quiz');
+  assert.match(await text('.track-detail'), /dans la file|en cours de traitement/, 'la fiche de suivi continue de se mettre à jour');
+  await ev(`document.querySelectorAll('.track-actions .btn')[1].click()`);            // rouvert : au même point du quiz
+  await waitFor(`!document.getElementById('offer').hidden && !!document.querySelector('#offer-stage .quiz-verdict')`, 'quiz rouvert au même point');
+  await ev(`document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }))`);  // Échap referme la scène de jeu
+  assert.equal(await offerHidden(), true);
+  assert.equal(await ev(`document.querySelectorAll('.track .quiz-choice').length >= 2`), true, 'le quiz est rangé dans la fiche');
+  await answered();
+});
+
+test('fenêtre de jeu : « Jouer à un jeu » ouvre le jeu dans la fenêtre agrandie, avec la progression en bas', async () => {
+  await fresh(URL_PERSIST);
+  await askTracked('plafond LENTE'); await waitOffer();
+  await ev(`document.getElementById('offer-game').click()`);
+  await waitFor(`document.querySelectorAll('#offer-stage .game-card').length === 12`, 'jeu dans la fenêtre');
+  assert.equal(await offerHidden(), false);
+  assert.equal(await text('#offer-play-name'), 'Jeu de mémoire');
+  assert.equal(await ev(`document.querySelector('.track-quiz').hidden && !document.querySelector('.track-game').hidden`), true, 'un seul des deux à la fois');
+  assert.equal(await ev(`document.querySelectorAll('.track-actions .btn')[0].getAttribute('aria-expanded')`), 'true');
+  assert.equal(await ev(`document.getElementById('offer-progress').getBoundingClientRect().height > 40 && document.getElementById('offer-prog-step').textContent.length > 10`), true, 'la progression reste visible pendant la partie');
+  await ev(`document.querySelector('#offer-stage .game-card').click()`);              // on joue vraiment : une carte se retourne
+  await waitFor(`document.querySelectorAll('#offer-stage .game-card.is-open, #offer-stage .game-card.is-matched').length >= 1`, 'carte retournée');
+  assert.equal(await ev(`document.querySelectorAll('#offer-stage .game-card').length`), 12);
+  await ev(`document.getElementById('offer-close').click()`);
+  assert.equal(await offerHidden(), true);
+  assert.equal(await ev(`document.activeElement === document.querySelectorAll('.track-actions .btn')[0]`), true, 'le focus revient au bouton du jeu');
+  await answered();
+});
+
+test('fenêtre de jeu : si la réponse arrive pendant une partie, un bandeau dans la fenêtre invite à la lire ; la partie n\'est pas interrompue', async () => {
   await fresh(URL_PERSIST);
   await askTracked(); await waitOffer();
   await ev(`document.getElementById('offer-quiz').click()`);
-  await waitFor(`!!document.querySelector('.quiz .quiz-title') && !document.querySelector('.track-quiz').hidden`, 'quiz ouvert');
-  assert.equal(await offerHidden(), true);
-  assert.equal(await ev(`document.querySelectorAll('.track-actions .btn')[1].getAttribute('aria-expanded')`), 'true');
-  assert.equal(await ev(`document.activeElement.className`), 'quiz-title', 'le focus est sur la présentation du quiz');
-  assert.ok(await exists('.track'), 'la demande suit son cours');
-  await waitFor(`!!document.querySelector('.track-ready')`, 'bandeau « réponse prête »', 40000);       // la réponse n'interrompt pas le quiz : le lecteur choisit
-  await ev(`document.querySelector('.track-ready .btn').click()`);
-  await answered(); assert.equal(await count('.quiz'), 0);
+  await waitFor(`!!document.querySelector('#offer-stage .quiz .quiz-title')`, 'quiz dans la fenêtre');
+  await startQuiz(); await quizPick(true);
+  await waitFor(`!!document.querySelector('#offer-progress .track-ready')`, 'bandeau « réponse prête » dans la fenêtre', 40000);
+  assert.equal(await offerHidden(), false, 'la fenêtre reste ouverte');
+  assert.equal(await count('#offer-stage .quiz'), 1, 'le quiz continue');
+  assert.equal(await exists('.quiz-verdict'), true, 'la correction reste affichée');
+  assert.equal(await exists('#answer .ans-text'), false, 'la réponse ne remplace rien sans l\'accord du lecteur');
+  assert.match(await text('#offer-prog-step'), /^Étape 4 sur 4 · Réponse disponible$/);
+  assert.equal(await ev(`document.querySelectorAll('#offer-progress .offer-prog-bar i.is-done').length`), 4);
+  assert.match(await text('#offer-progress .track-ready'), /Votre réponse est prête/);
+  await ev(`document.querySelector('#offer-progress .track-ready .btn').click()`);
+  await answered();
+  assert.equal(await offerHidden(), true, 'la fenêtre se referme quand la réponse est lue');
+  assert.equal(await count('.quiz'), 0);
+});
+
+test('quiz : des questions très simples (2 ou 3 réponses, phrases courtes, rien à retenir par cœur)', async () => {
   await fresh(URL_PERSIST);
-  await askTracked(); await waitOffer();
-  await ev(`document.getElementById('offer-game').click()`);
-  await waitFor(`document.querySelectorAll('.game-card').length === 12 && !document.querySelector('.track-game').hidden`, 'jeu ouvert');
-  assert.equal(await offerHidden(), true);
-  assert.equal(await ev(`document.querySelectorAll('.track-actions .btn')[0].getAttribute('aria-expanded')`), 'true');
-  assert.equal(await ev(`document.querySelector('.track-quiz').hidden`), true, 'un seul des deux à la fois');
-  await waitFor(`!!document.querySelector('.track-ready')`, 'bandeau « réponse prête »', 40000);
-  await ev(`document.querySelector('.track-ready .btn').click()`);
+  await askTracked('plafond LENTE'); await waitOffer();
+  await ev(`document.getElementById('offer-quiz').click()`);
+  await waitFor(`!!document.querySelector('#offer-stage .quiz .quiz-title')`, 'quiz dans la fenêtre');
+  await startQuiz();
+  for (let i = 1; i <= 5; i++) {
+    const q = await text('.quiz-question'), n = await count('.quiz-choice');
+    assert.ok(q.length <= 100, `question courte (${q.length}) : ${q}`);
+    assert.ok(n === 2 || n === 3, `2 ou 3 réponses : ${n}`);
+    assert.ok(!/n°|article \d|\d{4}/i.test(q), `aucun numéro, article ni date dans la question : ${q}`);
+    const p = await quizPick(true); assert.ok(['contenu', 'assistant'].includes(p.kind), p.kind);
+    await clickQuiz(i < 5 ? 'Question suivante' : 'Voir mon résultat');
+  }
+  assert.match(await text('.quiz-score'), /5 sur 5/);
+  await ev(`document.getElementById('offer-close').click()`);
   await answered();
 });
 
@@ -1012,7 +1096,7 @@ test('fenêtre de choix, téléphone : feuille en bas, cartes empilées et facil
   for (const [w, h] of [[390, 844], [320, 640]]) {
     await phone(w, h);
     try {
-      await fresh(URL_PERSIST); await askTracked(); await waitOffer();
+      await fresh(URL_PERSIST); await askTracked('plafond LENTE'); await waitOffer();
       const m = await offerGeometry();
       assert.ok(m.sw <= m.iw + 1, `${w} px : défilement horizontal ${m.sw} > ${m.iw}`);
       assert.ok(m.title >= 26 && m.title > m.lead, `${w} px : titre en grand : ${m.title}px`);
@@ -1025,10 +1109,19 @@ test('fenêtre de choix, téléphone : feuille en bas, cartes empilées et facil
       const k = await offerGeometry();
       await ev(`document.documentElement.style.removeProperty('--app-h')`);
       assert.ok(k.panel.b <= reduced + 1 && k.panel.t >= 0, `${w} px : la fenêtre reste dans la zone visible réduite à ${reduced} px : ${k.panel.t} → ${k.panel.b}`);
-      await ev(`document.getElementById('offer-quiz').click()`);
-      await waitFor(`!!document.querySelector('.quiz .quiz-title')`, 'quiz ouvert');
+      await ev(`document.getElementById('offer-quiz').click()`);                     // la scène de jeu sur téléphone : tout est visible, progression comprise
+      await waitFor(`!!document.querySelector('#offer-stage .quiz .quiz-title')`, 'quiz ouvert'); await settle();
+      await startQuiz(); await quizPick(true);
+      const p = await ev(`(() => { const r = (s) => { const b = document.querySelector(s).getBoundingClientRect(); return { t: b.top, b: b.bottom, h: b.height, w: b.width }; }; return { panel: r('#offer .offer-panel'), prog: r('#offer-progress'), stage: r('#offer-stage'), close: r('#offer-close'), choice: r('.quiz-choice'), vh: window.visualViewport.height, iw: innerWidth, sw: document.documentElement.scrollWidth }; })()`);
+      assert.equal(await offerHidden(), false);
+      assert.ok(p.sw <= p.iw + 1, `${w} px : pas de débordement avec le quiz : ${p.sw} > ${p.iw}`);
+      assert.ok(p.panel.t >= 0 && p.panel.b <= p.vh + 1, `${w} px : scène de jeu entièrement visible : ${p.panel.t} → ${p.panel.b} sur ${p.vh}`);
+      assert.ok(p.prog.b <= p.vh + 1 && p.prog.t >= p.stage.b - 1 && p.prog.h > 40, `${w} px : progression de la demande visible en bas : ${JSON.stringify(p.prog)}`);
+      assert.ok(p.close.h >= 44 && p.choice.h >= 44, `${w} px : zones tactiles : Fermer ${p.close.h}, réponse ${p.choice.h}`);
+      await ev(`document.getElementById('offer-close').click()`);
       assert.equal(await offerHidden(), true);
-      assert.ok(await ev(`document.documentElement.scrollWidth <= innerWidth + 1`), `${w} px : pas de débordement avec le quiz`);
+      assert.ok(await ev(`document.documentElement.scrollWidth <= innerWidth + 1`), `${w} px : pas de débordement à la fermeture`);
+      await answered();
     } finally { await desktop(); }
   }
 });
@@ -1038,9 +1131,13 @@ test('fenêtre de choix : elle apparaît en douceur ; avec « mouvement réduit 
   try {
     await media('no-preference'); await fresh(URL_PERSIST); await askTracked(); await waitOffer();
     assert.match(await ev(`getComputedStyle(document.querySelector('#offer .offer-panel')).animationName`), /rise/);
+    await ev(`document.getElementById('offer-quiz').click()`); await waitFor(`!!document.querySelector('#offer-stage .quiz')`, 'quiz');
+    assert.match(await ev(`getComputedStyle(document.querySelector('#offer .offer-panel')).animationName`), /offer-grow/, 'la fenêtre s\'agrandit en douceur');
     await media('reduce'); await fresh(URL_PERSIST); await askTracked(); await waitOffer();
     assert.equal(await ev(`getComputedStyle(document.querySelector('#offer .offer-panel')).animationName`), 'none');
     assert.equal(await ev(`getComputedStyle(document.querySelector('.offer-card')).transitionDuration`), '0s', 'aucune transition non plus');
+    await ev(`document.getElementById('offer-quiz').click()`); await waitFor(`!!document.querySelector('#offer-stage .quiz')`, 'quiz');
+    assert.equal(await ev(`getComputedStyle(document.querySelector('#offer .offer-panel')).animationName`), 'none', 'agrandie sans animation');
   } finally { await send('Emulation.setEmulatedMedia', { features: [] }); }
 });
 

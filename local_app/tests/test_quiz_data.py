@@ -60,13 +60,29 @@ def test_the_bank_is_varied_and_every_question_carries_a_complete_reference():
     assert sum(q["kind"] == "assistant" for q in QUESTIONS) >= 6, "assez de questions sur l'assistant pour varier d'une série à l'autre"
     for q in build.build_payload(CORPUS)["questions"]:
         s = q["source"]
-        assert q["question"].strip() and q["explanation"].strip() and 3 <= len(q["choices"]) <= 4 and 0 <= q["answer"] < len(q["choices"]), q["id"]
+        assert q["question"].strip() and q["explanation"].strip() and 2 <= len(q["choices"]) <= 3 and 0 <= q["answer"] < len(q["choices"]), q["id"]
         if q["kind"] == "assistant":
             assert all(s[k] for k in ("title", "type", "reference", "quote")), q["id"]
             continue
         assert all(s[k] for k in ("title", "type", "reference", "page", "quote", "url")), q["id"]
         if s["page"] > 1:
             assert s["url"].endswith("#page=%d" % s["page"]), q["id"]
+
+
+def test_only_the_easy_questions_are_served_and_they_are_written_in_plain_words():
+    """Le quiz doit rester très simple : pas de numéro, de date, d'article ni de page à retenir ; 2 ou 3 réponses ; des phrases courtes."""
+    levels = {q["id"]: q["level"] for q in QUESTIONS}
+    assert set(levels.values()) == {"facile", "difficile"}, "chaque question a un niveau"
+    payload = build.build_payload(CORPUS)["questions"]
+    assert {q["id"] for q in payload} == {i for i, lv in levels.items() if lv == "facile"}, "seules les questions faciles sont servies"
+    assert len(payload) >= 18, "assez de questions simples pour varier d'une série à l'autre"
+    assert sum(q["kind"] == "contenu" for q in payload) >= 8 and sum(q["kind"] == "assistant" for q in payload) >= 8
+    assert {q["kind"] for q in payload} == {"contenu", "assistant"}, "ni date, ni numéro, ni page, ni intitulé à retenir"
+    for q in payload:
+        assert 2 <= len(q["choices"]) <= 3, q["id"]
+        assert len(q["question"]) <= 100, f"question trop longue ({len(q['question'])}) : {q['id']}"
+        assert not re.search(r"n°|article \d|\d{4}|\bdu \d", q["question"], re.I), f"numéro, article ou date dans la question : {q['id']}"
+        assert all(len(c) <= 60 for c in q["choices"]), f"réponse trop longue : {q['id']}"
 
 
 def test_content_questions_cite_the_article_and_every_law_question_states_its_limit():
@@ -98,6 +114,9 @@ def test_the_verifier_detects_a_wrong_quote_page_date_number_or_document():
     assert mutated("loi-23-09-art-01-centimes", lambda q: q.update(limit="inexistante")), "limite inconnue non détectée"
     assert mutated("loi-23-09-art-01-centimes", lambda q: q["choices"].__setitem__(1, q["choices"][0])), "réponses identiques non détectées"
     assert mutated("loi-23-09-art-01-centimes", lambda q: q.update(answer=9)), "index invalide non détecté"
+    assert mutated("loi-23-09-art-01-centimes", lambda q: q.update(level="moyen")), "niveau inconnu non détecté"
+    assert mutated("loi-23-09-art-01-centimes", lambda q: q.update(choices=["100"], answer=0)), "une seule réponse non détectée"
+    assert not mutated("loi-23-09-art-01-centimes", lambda q: q.update(choices=["100", "10"], answer=0)), "deux réponses suffisent"
     assert not mutated("loi-23-09-art-01-centimes", lambda q: None), "la question intacte doit rester valide"
 
 

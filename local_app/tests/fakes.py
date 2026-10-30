@@ -40,6 +40,8 @@ def scripted_ask(question: str, use_llm: bool = False, k: int = 6, *, delay: flo
     if delay:
         time.sleep(delay)
     q = question.upper()
+    if "LENTE" in q and delay:                               # question volontairement lente : laisse aux tests de la fenêtre de jeu le temps de jouer sans que la réponse arrive
+        time.sleep(delay * 4)
     if "PLANTAGE" in q:
         raise FileNotFoundError(f"vecteurs absents ({INTERNAL_PATH})")
     if "BUG" in q:

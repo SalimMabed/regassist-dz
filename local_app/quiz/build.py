@@ -30,6 +30,8 @@ def build_payload(corpus: verify.Corpus | None = None) -> dict:
     limits = {k: v["text"] for k, v in data.get("limits", {}).items()}
     out = []
     for q in data["questions"]:
+        if q["level"] != "facile":               # les questions difficiles restent vérifiées dans questions.json mais ne sont jamais servies
+            continue
         s = q["source"]
         if q["kind"] == "assistant":             # source = le texte de l'application : ni PDF, ni numéro, ni date, ni page
             source = {"document_id": s["document_id"], "title": APP_TITLE, "type": "application", "number": None, "date": None,
@@ -57,17 +59,19 @@ def main(argv: list[str]) -> int:
         print("Quiz : questions NON vérifiées, rien n'est écrit.\n  " + "\n  ".join(problems))
         return 1
     text = render(build_payload(corpus))
-    n = len(json.loads(verify.QUESTIONS.read_text(encoding="utf-8"))["questions"])
+    all_q = json.loads(verify.QUESTIONS.read_text(encoding="utf-8"))["questions"]
+    n = len(all_q)
+    served = sum(q["level"] == "facile" for q in all_q)
     where = "corpus + PDF d'origine" if pdf else "corpus"
     if check:
         current = OUT.read_bytes().decode("utf-8") if OUT.is_file() else ""
         if current != text:
-            print(f"Quiz : {n} questions vérifiées ({where}) mais {OUT.name} n'est pas à jour : relancer python -m local_app.quiz.build")
+            print(f"Quiz : {n} questions vérifiées ({where}), {served} servies, mais {OUT.name} n'est pas à jour : relancer python -m local_app.quiz.build")
             return 1
-        print(f"Quiz : {n} questions vérifiées ({where}) ; {OUT.name} à jour.")
+        print(f"Quiz : {n} questions vérifiées ({where}), {served} servies ; {OUT.name} à jour.")
         return 0
     OUT.write_bytes(text.encode("utf-8"))                       # octets : pas de conversion de fin de ligne sous Windows
-    print(f"Quiz : {n} questions vérifiées ({where}) ; {OUT.relative_to(verify.ROOT)} écrit.")
+    print(f"Quiz : {n} questions vérifiées ({where}), {served} servies ; {OUT.relative_to(verify.ROOT)} écrit.")
     return 0
 
 

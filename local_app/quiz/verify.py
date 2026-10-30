@@ -19,6 +19,8 @@ INDEX_HTML = ROOT / "local_app" / "static" / "index.html"
 
 # « assistant » : question sur l'assistant lui-même (ce qu'il est, ce qu'il garantit ou non), prouvée par une citation du texte de l'application.
 KINDS = {"contenu", "objet", "valeur", "date", "numero", "type", "relation", "pages", "assistant"}
+# « facile » : servie dans le quiz (mots courants, 2 ou 3 réponses) ; « difficile » : vérifiée mais jamais servie (dates, numéros, pages, intitulés).
+LEVELS = {"facile", "difficile"}
 MONTHS = ["janvier", "février", "mars", "avril", "mai", "juin", "juillet", "août", "septembre", "octobre", "novembre", "décembre"]
 PAGE_MARK = re.compile(r"\[\[PAGE (\d+)\]\]")
 
@@ -96,14 +98,16 @@ def check_question(q: dict, corpus: Corpus, limits: dict | None = None, pdf: boo
     kind = q.get("kind")
     if kind not in KINDS:
         err(f"type de question inconnu ({kind})")
+    if q.get("level") not in LEVELS:
+        err("niveau inconnu ou absent (facile ou difficile)")
     for field in ("question", "choices", "answer", "explanation", "source", "check"):
         if field not in q:
             err(f"champ manquant : {field}")
     if bad:
         return bad
     choices, ans = q["choices"], q["answer"]
-    if not 3 <= len(choices) <= 4:
-        err("3 ou 4 réponses attendues")
+    if not 2 <= len(choices) <= 4:
+        err("2 à 4 réponses attendues")
     if not isinstance(ans, int) or not 0 <= ans < len(choices):
         err("index de bonne réponse invalide")
         return bad

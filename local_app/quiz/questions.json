@@ -9,54 +9,83 @@
   },
   "questions": [
     {
+      "id": "loi-23-09-art-01-monnaie",
+      "kind": "contenu",
+      "level": "facile",
+      "question": "Quelle est la monnaie de l’Algérie ?",
+      "choices": ["Le dinar algérien", "L’euro", "Le dollar"],
+      "answer": 0,
+      "explanation": "L’article 1er précise que l’unité monétaire du pays est le dinar algérien, en abrégé DA.",
+      "limit": "loi-23-09-modifiee",
+      "source": {"document_id": "LOI-23-09.fr", "reference": "Article 1er", "page": 7, "quote": "L’unité monétaire de la République algérienne démocratique et populaire est le dinar algérien, en abrégé DA."},
+      "check": {"evidence": ["est le dinar algérien"]}
+    },
+    {
       "id": "loi-23-09-art-01-centimes",
       "kind": "contenu",
-      "question": "Selon l’article 1er de la loi monétaire et bancaire (loi n° 23-09 du 21 juin 2023), le dinar algérien est divisé en…",
-      "choices": ["100 parts égales, dénommées centimes", "10 parts égales, dénommées dixièmes", "1 000 parts égales, dénommées millimes", "50 parts égales, dénommées demi-dinars"],
+      "level": "facile",
+      "question": "Combien de centimes y a-t-il dans un dinar ?",
+      "choices": ["100", "10", "1 000"],
       "answer": 0,
-      "explanation": "L’article 1er précise que le dinar algérien (DA) est divisé en cent parts égales, dénommées centimes (CTS).",
+      "explanation": "L’article 1er précise que le dinar algérien (DA) est divisé en cent parts égales, dénommées centimes (CTS) : il y a donc 100 centimes dans un dinar.",
       "limit": "loi-23-09-modifiee",
       "source": {"document_id": "LOI-23-09.fr", "reference": "Article 1er", "page": 7, "quote": "Le dinar algérien (DA) est divisé en cent parts égales dénommées centimes, en abrégé CTS."},
       "check": {"evidence": ["cent parts égales dénommées centimes"]}
     },
     {
+      "id": "loi-23-09-art-02-formes",
+      "kind": "contenu",
+      "level": "facile",
+      "question": "Quelles sont les deux formes de monnaie que l’on peut tenir dans la main ?",
+      "choices": ["Les billets de banque et les pièces", "Les chèques et les cartes bancaires", "Les actions et les obligations"],
+      "answer": 0,
+      "explanation": "L’article 2 précise que la monnaie, dans sa forme matérielle, est constituée de billets de banque et de pièces de monnaie métallique.",
+      "limit": "loi-23-09-modifiee",
+      "source": {"document_id": "LOI-23-09.fr", "reference": "Article 2", "page": 7, "quote": "La monnaie fiduciaire dans sa forme matérielle est constituée de billets de banque et de pièces de monnaie métallique."},
+      "check": {"evidence": ["billets de banque et de pièces de monnaie métallique"]}
+    },
+    {
+      "id": "loi-23-09-art-02-numerique",
+      "kind": "contenu",
+      "level": "facile",
+      "question": "Comment s’appelle la version numérique du dinar ?",
+      "choices": ["Le Dinar Algérien Digital", "La cryptomonnaie nationale", "Le dinar électronique des banques"],
+      "answer": 0,
+      "explanation": "Selon l’article 2, la monnaie peut prendre une forme numérique, dénommée monnaie digitale de banque centrale (Dinar Algérien Digital).",
+      "limit": "loi-23-09-modifiee",
+      "source": {"document_id": "LOI-23-09.fr", "reference": "Article 2", "page": 7, "quote": "Elle peut prendre une forme numérique, dénommée monnaie digitale de banque centrale (Dinar Algérien Digital)."},
+      "check": {"evidence": ["Dinar Algérien Digital"]}
+    },
+    {
       "id": "loi-23-09-art-02-privilege",
       "kind": "contenu",
-      "question": "À qui appartient le privilège d’émettre la monnaie fiduciaire sur le territoire national, selon l’article 2 de la loi n° 23-09 ?",
-      "choices": ["À l’État, qui en délègue l’exercice à titre exclusif à la Banque d’Algérie", "À chaque banque commerciale, pour ses propres billets", "À chaque wilaya, sur son territoire"],
+      "level": "facile",
+      "question": "Qui est chargé d’émettre les billets et les pièces de monnaie ?",
+      "choices": ["La banque centrale : la Banque d’Algérie", "Chaque banque commerciale", "Chaque wilaya"],
       "answer": 0,
-      "explanation": "L’article 2 prévoit que ce privilège appartient à l’État et que son exercice est délégué à titre exclusif à la banque centrale, dénommée « Banque d’Algérie ».",
+      "explanation": "L’article 2 prévoit que le privilège d’émettre la monnaie appartient à l’État, et que son exercice est délégué à titre exclusif à la banque centrale, dénommée « Banque d’Algérie ».",
       "limit": "loi-23-09-modifiee",
       "source": {"document_id": "LOI-23-09.fr", "reference": "Article 2", "page": 7, "quote": "Le privilège d’émettre, sur le territoire national, la monnaie fiduciaire appartient à l’Etat. L’exercice de ce privilège est délégué à titre exclusif à la banque centrale"},
       "check": {"evidence": ["appartient à l’Etat", "délégué à titre exclusif à la banque centrale"]}
     },
     {
-      "id": "loi-23-09-art-02-numerique",
+      "id": "loi-23-09-art-08-faux-billets",
       "kind": "contenu",
-      "question": "L’article 2 de la loi n° 23-09 prévoit que la monnaie fiduciaire peut prendre une forme numérique. Comment est-elle dénommée ?",
-      "choices": ["Monnaie digitale de banque centrale (Dinar Algérien Digital)", "Cryptomonnaie nationale", "Dinar électronique commercial", "Monnaie scripturale d’État"],
+      "level": "facile",
+      "question": "Peut-on fabriquer ou utiliser de faux billets ?",
+      "choices": ["Non, c’est interdit", "Oui, c’est permis"],
       "answer": 0,
-      "explanation": "Selon l’article 2, la monnaie fiduciaire peut prendre une forme numérique, dénommée monnaie digitale de banque centrale (Dinar Algérien Digital).",
+      "explanation": "L’article 8 déclare prohibées la contrefaçon et la falsification des billets de banque et des pièces de monnaie, ainsi que l’usage, la vente et la distribution de billets contrefaits.",
       "limit": "loi-23-09-modifiee",
-      "source": {"document_id": "LOI-23-09.fr", "reference": "Article 2", "page": 7, "quote": "Elle peut prendre une forme numérique, dénommée monnaie digitale de banque centrale (Dinar Algérien Digital)."},
-      "check": {"evidence": ["monnaie digitale de banque centrale (Dinar Algérien Digital)"]}
-    },
-    {
-      "id": "loi-23-09-art-05-delai",
-      "kind": "contenu",
-      "question": "Un billet de banque retiré de la circulation perd son pouvoir libératoire s’il n’est pas présenté à l’échange dans un délai maximum de… (article 5 de la loi n° 23-09)",
-      "choices": ["10 ans, à compter de la décision de retrait", "1 an, à compter de la décision de retrait", "5 ans, à compter de la fabrication du billet", "30 ans, à compter de l’émission du billet"],
-      "answer": 0,
-      "explanation": "L’article 5 fixe un délai maximum de dix (10) ans à compter de la date de la décision de retrait. Passé ce délai, la contre-valeur est acquise au Trésor public.",
-      "limit": "loi-23-09-modifiee",
-      "source": {"document_id": "LOI-23-09.fr", "reference": "Article 5", "page": 7, "quote": "de dix (10) ans, à compter de la date de la décision de retrait"},
-      "check": {"evidence": ["dix (10) ans"]}
+      "source": {"document_id": "LOI-23-09.fr", "reference": "Article 8", "page": 7, "quote": "billets de banque ou pièces contrefaits et/ou falsifiés, sont prohibées"},
+      "check": {"evidence": ["sont prohibées"]}
     },
     {
       "id": "loi-23-09-art-10-capital",
       "kind": "contenu",
-      "question": "Selon l’article 10 de la loi n° 23-09, par qui le capital de la Banque d’Algérie est-il souscrit ?",
-      "choices": ["Entièrement par l’État", "Par les banques commerciales agréées", "Par des actionnaires privés et publics", "Par une institution financière internationale"],
+      "level": "facile",
+      "question": "À qui appartient le capital de la Banque d’Algérie ?",
+      "choices": ["À l’État", "À des actionnaires privés", "À des banques étrangères"],
       "answer": 0,
       "explanation": "L’article 10 indique que le capital de la Banque d’Algérie est entièrement souscrit par l’État.",
       "limit": "loi-23-09-modifiee",
@@ -66,8 +95,9 @@
     {
       "id": "loi-23-09-art-11-siege",
       "kind": "contenu",
-      "question": "Où le siège de la Banque d’Algérie est-il fixé, selon l’article 11 de la loi n° 23-09 ?",
-      "choices": ["À Alger", "À Oran", "À Constantine", "À Annaba"],
+      "level": "facile",
+      "question": "Dans quelle ville se trouve le siège de la Banque d’Algérie ?",
+      "choices": ["Alger", "Oran", "Constantine"],
       "answer": 0,
       "explanation": "L’article 11 fixe le siège de la Banque d’Algérie à Alger. Il ajoute qu’elle établit des succursales ou des agences dans les wilayas et localités où elle le juge nécessaire.",
       "limit": "loi-23-09-modifiee",
@@ -75,8 +105,176 @@
       "check": {"evidence": ["fixé à Alger"]}
     },
     {
+      "id": "loi-23-09-art-13-gouverneur",
+      "kind": "contenu",
+      "level": "facile",
+      "question": "Qui dirige la Banque d’Algérie ?",
+      "choices": ["Un Gouverneur, assisté de trois vice-gouverneurs", "Un président élu par les clients", "Un comité de commerçants"],
+      "answer": 0,
+      "explanation": "L’article 13 précise que la direction de la Banque d’Algérie est assurée par un Gouverneur assisté de trois vice-gouverneurs.",
+      "limit": "loi-23-09-modifiee",
+      "source": {"document_id": "LOI-23-09.fr", "reference": "Article 13", "page": 8, "quote": "La direction de la Banque d’Algérie est assurée par un Gouverneur assisté de trois (3) vice-gouverneurs."},
+      "check": {"evidence": ["assurée par un Gouverneur"]}
+    },
+    {
+      "id": "reg-26-01-art-02-presidence",
+      "kind": "contenu",
+      "level": "facile",
+      "question": "Qui préside le Comité national des paiements ?",
+      "choices": ["Le Gouverneur de la Banque d’Algérie", "Le ministre du Commerce", "Le président de l’association des banques"],
+      "answer": 0,
+      "explanation": "L’article 2 cite d’abord le Gouverneur de la Banque d’Algérie en tant que président, ou son représentant parmi ses vice-gouverneurs. Les représentants des ministères y siègent comme membres.",
+      "source": {"document_id": "REG-26-01.fr", "reference": "Article 2", "page": 2, "quote": "le Gouverneur de la Banque d’Algérie en tant que président ou de son représentant parmi ses vice-gouverneurs"},
+      "check": {"evidence": ["en tant que président"]}
+    },
+    {
+      "id": "assistant-redaction",
+      "kind": "assistant",
+      "level": "facile",
+      "question": "Qui rédige les réponses de cet assistant ?",
+      "choices": ["Une intelligence artificielle", "Un juriste de la Banque d’Algérie", "Un employé qui lit votre question"],
+      "answer": 0,
+      "explanation": "Le bandeau de l’application le dit : les réponses sont rédigées par une intelligence artificielle, à partir des textes publics retrouvés. Ce n’est pas un juriste qui les écrit.",
+      "source": {"kind": "app", "document_id": "APP-redaction", "reference": "Bandeau « Projet éducatif non officiel »", "quote": "rédigées par une intelligence artificielle"},
+      "check": {"evidence": ["rédigées par une intelligence artificielle"]}
+    },
+    {
+      "id": "assistant-sources",
+      "kind": "assistant",
+      "level": "facile",
+      "question": "Pour répondre, sur quoi l’intelligence artificielle s’appuie-t-elle ?",
+      "choices": ["Sur les passages retrouvés dans les textes publics", "Sur tout ce qu’elle a appris sur Internet", "Sur l’avis d’un juriste"],
+      "answer": 0,
+      "explanation": "L’assistant retrouve d’abord les passages pertinents dans les textes publics, puis l’intelligence artificielle rédige sa réponse à partir de ces seuls passages.",
+      "source": {"kind": "app", "document_id": "APP-sources", "reference": "Panneau « À propos » : « Comment il répond »", "quote": "une intelligence artificielle rédige une réponse à partir de ces seuls passages"},
+      "check": {"evidence": ["à partir de ces seuls passages"]}
+    },
+    {
+      "id": "assistant-formation",
+      "kind": "assistant",
+      "level": "facile",
+      "question": "L’intelligence artificielle a-t-elle été entraînée sur ces textes ?",
+      "choices": ["Non : elle les lit au moment de la question", "Oui : elle les connaît par cœur"],
+      "answer": 0,
+      "explanation": "L’application précise que cette intelligence artificielle n’a été ni entraînée ni spécialisée sur ces textes : elle les lit au moment de la question.",
+      "source": {"kind": "app", "document_id": "APP-formation", "reference": "Panneau « À propos » : « Comment il répond »", "quote": "n’a pas été entraînée ni spécialisée sur ces textes : elle les lit au moment de la question"},
+      "check": {"evidence": ["ni spécialisée sur ces textes"]}
+    },
+    {
+      "id": "assistant-verifier",
+      "kind": "assistant",
+      "level": "facile",
+      "question": "Que faut-il faire d’une réponse de l’assistant ?",
+      "choices": ["La vérifier dans le PDF officiel", "La croire sans vérifier"],
+      "answer": 0,
+      "explanation": "Une réponse rédigée par une intelligence artificielle peut contenir des erreurs : le panneau demande de toujours la vérifier dans le PDF officiel.",
+      "source": {"kind": "app", "document_id": "APP-verifier", "reference": "Panneau « À propos » : « Ses limites »", "quote": "vérifiez toujours dans le PDF officiel"},
+      "check": {"evidence": ["vérifiez toujours dans le PDF officiel"]}
+    },
+    {
+      "id": "assistant-juriste",
+      "kind": "assistant",
+      "level": "facile",
+      "question": "Un juriste a-t-il validé les réponses de l’assistant ?",
+      "choices": ["Non, aucun juriste ne les a validées", "Oui, un juriste valide chaque réponse"],
+      "answer": 0,
+      "explanation": "Le panneau « Ses limites » indique que les réponses peuvent être incomplètes, erronées ou dépassées, et qu’elles n’ont pas été validées par un juriste.",
+      "source": {"kind": "app", "document_id": "APP-juriste", "reference": "Panneau « À propos » : « Ses limites »", "quote": "n’ont pas été validées par un juriste"},
+      "check": {"evidence": ["n’ont pas été validées par un juriste"]}
+    },
+    {
+      "id": "assistant-avis",
+      "kind": "assistant",
+      "level": "facile",
+      "question": "Une réponse de l’assistant est-elle un avis juridique ?",
+      "choices": ["Non, ce n’est pas un avis juridique", "Oui, c’est un avis juridique"],
+      "answer": 0,
+      "explanation": "Le panneau « Ses limites » est clair : l’assistant ne remplace ni un professionnel du droit ni le texte officiel, et ce n’est pas un avis juridique.",
+      "source": {"kind": "app", "document_id": "APP-avis", "reference": "Panneau « À propos » : « Ses limites »", "quote": "Ce n’est pas un avis juridique"},
+      "check": {"evidence": ["Ce n’est pas un avis juridique"]}
+    },
+    {
+      "id": "assistant-remplace",
+      "kind": "assistant",
+      "level": "facile",
+      "question": "L’assistant remplace-t-il un juriste ?",
+      "choices": ["Non, il ne remplace pas un professionnel du droit", "Oui, il le remplace"],
+      "answer": 0,
+      "explanation": "Le panneau « Ses limites » le dit : l’assistant ne remplace ni un professionnel du droit ni le texte officiel.",
+      "source": {"kind": "app", "document_id": "APP-remplace", "reference": "Panneau « À propos » : « Ses limites »", "quote": "Il ne remplace ni un professionnel du droit ni le texte officiel"},
+      "check": {"evidence": ["ne remplace ni un professionnel du droit"]}
+    },
+    {
+      "id": "assistant-erreurs",
+      "kind": "assistant",
+      "level": "facile",
+      "question": "Une réponse de l’assistant peut-elle contenir des erreurs ?",
+      "choices": ["Oui, elle peut être incomplète ou erronée", "Non, jamais"],
+      "answer": 0,
+      "explanation": "Le panneau « Ses limites » prévient que les réponses peuvent être incomplètes, erronées ou dépassées : c’est pourquoi il faut les vérifier dans le texte officiel.",
+      "source": {"kind": "app", "document_id": "APP-erreurs", "reference": "Panneau « À propos » : « Ses limites »", "quote": "Les réponses peuvent être incomplètes, erronées ou dépassées"},
+      "check": {"evidence": ["incomplètes, erronées ou dépassées"]}
+    },
+    {
+      "id": "assistant-vigueur",
+      "kind": "assistant",
+      "level": "facile",
+      "question": "L’application garantit-elle qu’un texte n’a pas été modifié depuis sa publication ?",
+      "choices": ["Non, ce n’est pas garanti", "Oui, elle le garantit"],
+      "answer": 0,
+      "explanation": "Tous les textes ne sont pas couverts, et l’application ne garantit pas la situation actuelle d’un texte : un texte a pu être modifié, remplacé ou abrogé.",
+      "source": {"kind": "app", "document_id": "APP-vigueur", "reference": "Panneau « À propos » : « Ses limites »", "quote": "la situation actuelle d’un texte (modifié, remplacé, abrogé) n’est pas garantie"},
+      "check": {"evidence": ["la situation actuelle d’un texte (modifié, remplacé, abrogé) n’est pas garantie"]}
+    },
+    {
+      "id": "assistant-donnees",
+      "kind": "assistant",
+      "level": "facile",
+      "question": "Sur quels textes cet assistant est-il construit ?",
+      "choices": ["Sur des textes publics de la Banque d’Algérie", "Sur des documents internes et confidentiels", "Sur vos messages privés"],
+      "answer": 0,
+      "explanation": "Il est construit exclusivement à partir de données publiques : les règlements, instructions et notes publiés sur le site de la Banque d’Algérie. Aucun document privé ou confidentiel n’est utilisé.",
+      "source": {"kind": "app", "document_id": "APP-donnees", "reference": "Panneau « À propos » : « Les données »", "quote": "exclusivement à partir de données publiques"},
+      "check": {"evidence": ["exclusivement à partir de données publiques"]}
+    },
+    {
+      "id": "assistant-fait-foi",
+      "kind": "assistant",
+      "level": "facile",
+      "question": "Qui fait foi : la réponse de l’assistant ou le PDF officiel ?",
+      "choices": ["Le PDF officiel", "La réponse de l’assistant"],
+      "answer": 0,
+      "explanation": "Le bandeau de l’application le dit : seul le texte officiel (PDF) fait foi, pas la réponse rédigée par l’intelligence artificielle.",
+      "source": {"kind": "app", "document_id": "APP-fait-foi", "reference": "Bandeau « Projet éducatif non officiel »", "quote": "Seul le texte officiel (PDF) fait foi"},
+      "check": {"evidence": ["Seul le texte officiel (PDF) fait foi"]}
+    },
+    {
+      "id": "assistant-affiliation",
+      "kind": "assistant",
+      "level": "facile",
+      "question": "Cet assistant est-il l’assistant officiel de la Banque d’Algérie ?",
+      "choices": ["Non, c’est un projet éducatif non officiel", "Oui, c’est son assistant officiel"],
+      "answer": 0,
+      "explanation": "Cet assistant est un projet éducatif non officiel : il n’est affilié ni à la Banque d’Algérie ni à aucune autorité, et n’a été approuvé par aucune d’elles.",
+      "source": {"kind": "app", "document_id": "APP-affiliation", "reference": "Panneau « À propos »", "quote": "n’est affilié ni à la Banque d’Algérie ni à aucune autorité, et n’a été approuvé par aucune d’elles"},
+      "check": {"evidence": ["n’a été approuvé par aucune d’elles"]}
+    },
+    {
+      "id": "loi-23-09-art-05-delai",
+      "kind": "contenu",
+      "level": "difficile",
+      "question": "Un billet de banque retiré de la circulation perd son pouvoir libératoire s’il n’est pas présenté à l’échange dans un délai maximum de… (article 5 de la loi n° 23-09)",
+      "choices": ["10 ans, à compter de la décision de retrait", "1 an, à compter de la décision de retrait", "5 ans, à compter de la fabrication du billet", "30 ans, à compter de l’émission du billet"],
+      "answer": 0,
+      "explanation": "L’article 5 fixe un délai maximum de dix (10) ans à compter de la date de la décision de retrait. Passé ce délai, la contre-valeur est acquise au Trésor public.",
+      "limit": "loi-23-09-modifiee",
+      "source": {"document_id": "LOI-23-09.fr", "reference": "Article 5", "page": 7, "quote": "de dix (10) ans, à compter de la date de la décision de retrait"},
+      "check": {"evidence": ["dix (10) ans"]}
+    },
+    {
       "id": "loi-23-09-art-13-mandat",
       "kind": "contenu",
+      "level": "difficile",
       "question": "Pour quelle durée le Gouverneur de la Banque d’Algérie est-il nommé, selon l’article 13 de la loi n° 23-09 ?",
       "choices": ["5 ans, renouvelable une seule fois", "3 ans, renouvelable deux fois", "7 ans, non renouvelable", "10 ans, renouvelable sans limite"],
       "answer": 0,
@@ -88,6 +286,7 @@
     {
       "id": "reg-26-01-art-01-mission",
       "kind": "contenu",
+      "level": "difficile",
       "question": "Quelle est la mission principale du Comité national des paiements, selon l’article 1er du règlement n° 26-01 du 31 mai 2026 ?",
       "choices": ["Élaborer le projet de stratégie nationale de développement des moyens de paiement scripturaux", "Émettre les billets de banque et les pièces de monnaie", "Agréer les banques et les établissements financiers", "Fixer le taux de réescompte"],
       "answer": 0,
@@ -96,18 +295,9 @@
       "check": {"evidence": ["stratégie nationale de développement des moyens de paiements scripturaux"]}
     },
     {
-      "id": "reg-26-01-art-02-presidence",
-      "kind": "contenu",
-      "question": "Selon l’article 2 du règlement n° 26-01, qui préside le Comité national des paiements ?",
-      "choices": ["Le Gouverneur de la Banque d’Algérie, ou son représentant parmi les vice-gouverneurs", "Un représentant du ministère des Finances", "Le président de l’association des banques", "Le ministre du Commerce"],
-      "answer": 0,
-      "explanation": "L’article 2 cite d’abord le Gouverneur de la Banque d’Algérie en tant que président, ou son représentant parmi ses vice-gouverneurs. Les représentants des ministères y siègent comme membres.",
-      "source": {"document_id": "REG-26-01.fr", "reference": "Article 2", "page": 2, "quote": "le Gouverneur de la Banque d’Algérie en tant que président ou de son représentant parmi ses vice-gouverneurs"},
-      "check": {"evidence": ["en tant que président"]}
-    },
-    {
       "id": "reg-23-01-objet",
       "kind": "objet",
+      "level": "difficile",
       "question": "De quoi traite le règlement n° 2023-01 du 21 septembre 2023 ?",
       "choices": ["Des conditions d’autorisation, d’agrément et d’exercice des bureaux de change", "Du système de garantie des dépôts bancaires", "Du programme spécial de refinancement", "De l’apport de liquidité d’urgence"],
       "answer": 0,
@@ -118,6 +308,7 @@
     {
       "id": "reg-26-03-objet",
       "kind": "objet",
+      "level": "difficile",
       "question": "De quelle activité traite le règlement n° 26-03 du 13 août 2026 ?",
       "choices": ["L’affacturage, exercé par les banques et les établissements financiers", "La finance participative", "Le marché interbancaire des changes", "La protection de la clientèle"],
       "answer": 0,
@@ -128,6 +319,7 @@
     {
       "id": "reg-25-04-objet",
       "kind": "objet",
+      "level": "difficile",
       "question": "De quoi traite le règlement n° 25-04 du 7 mai 2025 ?",
       "choices": ["De l’apport de liquidité d’urgence", "Du capital minimum des banques", "Des bureaux de change", "De la création d’un billet de banque"],
       "answer": 0,
@@ -138,6 +330,7 @@
     {
       "id": "reg-20-03-objet",
       "kind": "objet",
+      "level": "difficile",
       "question": "De quoi traite le règlement n° 2020-03 du 15 mars 2020 ?",
       "choices": ["Du système de garantie des dépôts bancaires", "Des bureaux de change", "De l’affacturage", "De la finance islamique"],
       "answer": 0,
@@ -148,6 +341,7 @@
     {
       "id": "reg-21-02-objet",
       "kind": "objet",
+      "level": "difficile",
       "question": "De quoi traite le règlement n° 2021-02 du 10 juin 2021 ?",
       "choices": ["D’un programme spécial de refinancement", "D’une pièce commémorative", "Des règles comptables des banques", "Des transactions courantes avec l’étranger"],
       "answer": 0,
@@ -158,6 +352,7 @@
     {
       "id": "ld-04-25-objet",
       "kind": "objet",
+      "level": "difficile",
       "question": "Sur quel sujet portent les lignes directrices n° 04/2025 du 26 octobre 2025 ?",
       "choices": ["Les personnes politiquement exposées", "Les bureaux de change", "Les billets de banque", "Le marché interbancaire des changes"],
       "answer": 0,
@@ -168,6 +363,7 @@
     {
       "id": "reg-18-07-valeur",
       "kind": "valeur",
+      "level": "difficile",
       "question": "Le règlement n° 2018-07 du 4 novembre 2018 porte création d’un billet de banque de quelle valeur ?",
       "choices": ["1 000 dinars algériens", "500 dinars algériens", "2 000 dinars algériens", "200 dinars algériens"],
       "answer": 0,
@@ -178,6 +374,7 @@
     {
       "id": "reg-23-02-valeur",
       "kind": "valeur",
+      "level": "difficile",
       "question": "Le règlement n° 2023-02 du 21 septembre 2023 porte création, émission et mise en circulation d’une pièce de monnaie métallique de quelle valeur ?",
       "choices": ["10 dinars algériens", "50 dinars algériens", "100 dinars algériens", "200 dinars algériens"],
       "answer": 0,
@@ -188,6 +385,7 @@
     {
       "id": "reg-20-01-date",
       "kind": "date",
+      "level": "difficile",
       "question": "À quelle date a été pris le règlement n° 2020-01 fixant les règles générales en matière de conditions de banque applicables aux opérations de banque ?",
       "choices": ["15 mars 2020", "7 décembre 2020", "4 novembre 2018", "21 septembre 2023"],
       "answer": 0,
@@ -198,6 +396,7 @@
     {
       "id": "reg-18-02-date",
       "kind": "date",
+      "level": "difficile",
       "question": "À quelle date a été pris le règlement n° 2018-02 portant conditions d’exercice des opérations de banque relevant de la finance participative ?",
       "choices": ["4 novembre 2018", "30 avril 2018", "15 mars 2020", "7 décembre 2020"],
       "answer": 0,
@@ -208,6 +407,7 @@
     {
       "id": "reg-26-01-numero",
       "kind": "numero",
+      "level": "difficile",
       "question": "Quel est le numéro du règlement du 31 mai 2026 portant organisation et fonctionnement du Comité national des paiements ?",
       "choices": ["n° 26-01", "n° 26-02", "n° 25-01", "n° 24-01"],
       "answer": 0,
@@ -218,6 +418,7 @@
     {
       "id": "ins-01-2000-numero",
       "kind": "numero",
+      "level": "difficile",
       "question": "Quel est le numéro de l’instruction du 26 janvier 2000 fixant le taux de réescompte ?",
       "choices": ["n° 01-2000", "n° 05-99", "n° 08-2000", "n° 01-2001"],
       "answer": 0,
@@ -228,6 +429,7 @@
     {
       "id": "ins-01-2000-type",
       "kind": "type",
+      "level": "difficile",
       "question": "Le texte n° 01-2000 du 26 janvier 2000, qui fixe le taux de réescompte, est…",
       "choices": ["Une instruction", "Un règlement", "Une loi", "Une note aux banques"],
       "answer": 0,
@@ -238,6 +440,7 @@
     {
       "id": "reg-18-01-relation",
       "kind": "relation",
+      "level": "difficile",
       "question": "Le règlement n° 2018-01 du 30 avril 2018 modifie et complète le règlement n° 2004-03 du 4 mars 2004. À quoi ce dernier est-il relatif ?",
       "choices": ["Au système de garantie des dépôts", "Au capital minimum des banques", "Aux bureaux de change", "À la finance islamique"],
       "answer": 0,
@@ -248,6 +451,7 @@
     {
       "id": "loi-17-10-relation",
       "kind": "relation",
+      "level": "difficile",
       "question": "Quel texte la loi n° 17-10 du 11 octobre 2017 vient-elle compléter ?",
       "choices": ["L’ordonnance n° 03-11 du 26 août 2003 relative à la monnaie et au crédit", "La loi n° 90-10 du 14 avril 1990 relative à la monnaie et au crédit", "L’ordonnance n° 96-22 du 9 juillet 1996 relative à la répression des infractions à la réglementation des changes"],
       "answer": 0,
@@ -258,6 +462,7 @@
     {
       "id": "reg-26-02-relation",
       "kind": "relation",
+      "level": "difficile",
       "question": "Le règlement n° 26-02 du 23 juillet 2026 modifie et complète le règlement n° 07-01 du 3 février 2007. Quel est l’objet de ce dernier ?",
       "choices": ["Les règles applicables aux transactions courantes avec l’étranger et aux comptes devises", "La prévention du blanchiment d’argent", "Le capital minimum des banques", "La finance participative"],
       "answer": 0,
@@ -268,102 +473,13 @@
     {
       "id": "loi-23-09-pages",
       "kind": "pages",
+      "level": "difficile",
       "question": "Combien de pages compte le PDF officiel de la loi n° 23-09 du 21 juin 2023 portant loi monétaire et bancaire ?",
       "choices": ["41 pages", "12 pages", "27 pages", "58 pages"],
       "answer": 0,
       "explanation": "Le PDF mis en ligne par la Banque d’Algérie compte 41 pages.",
       "source": {"document_id": "LOI-23-09.fr", "reference": "Document complet", "page": 1, "quote": "Loi n° 23-09 du 3 Dhou El Hidja 1444 correspondant au 21 juin 2023 portant Loi monétaire et bancaire"},
       "check": {"page_count": 41}
-    },
-    {
-      "id": "assistant-sources",
-      "kind": "assistant",
-      "question": "D’après le panneau « À propos » de cet assistant, sur quoi l’intelligence artificielle s’appuie-t-elle pour rédiger sa réponse ?",
-      "choices": ["Sur les seuls passages retrouvés dans les textes publics", "Sur tout ce qu’elle a appris sur Internet", "Sur l’avis d’un juriste de la Banque d’Algérie", "Sur les décisions de justice les plus récentes"],
-      "answer": 0,
-      "explanation": "L’assistant retrouve d’abord les passages pertinents dans les textes publics, puis l’intelligence artificielle rédige sa réponse à partir de ces seuls passages.",
-      "source": {"kind": "app", "document_id": "APP-sources", "reference": "Panneau « À propos » : « Comment il répond »", "quote": "une intelligence artificielle rédige une réponse à partir de ces seuls passages"},
-      "check": {"evidence": ["à partir de ces seuls passages"]}
-    },
-    {
-      "id": "assistant-formation",
-      "kind": "assistant",
-      "question": "Cette intelligence artificielle a-t-elle été entraînée sur les textes de la Banque d’Algérie ?",
-      "choices": ["Non : elle les lit au moment de la question", "Oui : elle a été entièrement entraînée sur ces textes", "Oui : elle a été spécialisée par la Banque d’Algérie", "Seulement sur les textes les plus récents"],
-      "answer": 0,
-      "explanation": "L’application précise que cette intelligence artificielle n’a été ni entraînée ni spécialisée sur ces textes : elle les lit au moment de la question.",
-      "source": {"kind": "app", "document_id": "APP-formation", "reference": "Panneau « À propos » : « Comment il répond »", "quote": "n’a pas été entraînée ni spécialisée sur ces textes : elle les lit au moment de la question"},
-      "check": {"evidence": ["ni spécialisée sur ces textes"]}
-    },
-    {
-      "id": "assistant-verifier",
-      "kind": "assistant",
-      "question": "Que recommande le panneau « À propos » de faire d’une réponse de l’assistant ?",
-      "choices": ["La vérifier dans le PDF officiel", "La transmettre telle quelle, sans la relire", "La faire confirmer par l’assistant lui-même", "La considérer comme sûre dès qu’elle cite une source"],
-      "answer": 0,
-      "explanation": "Une réponse rédigée par une intelligence artificielle peut contenir des erreurs : le panneau demande de toujours la vérifier dans le PDF officiel.",
-      "source": {"kind": "app", "document_id": "APP-verifier", "reference": "Panneau « À propos » : « Ses limites »", "quote": "vérifiez toujours dans le PDF officiel"},
-      "check": {"evidence": ["vérifiez toujours dans le PDF officiel"]}
-    },
-    {
-      "id": "assistant-juriste",
-      "kind": "assistant",
-      "question": "D’après l’application, les réponses de l’assistant ont-elles été validées par un juriste ?",
-      "choices": ["Non, elles n’ont pas été validées par un juriste", "Oui, par un juriste de la Banque d’Algérie", "Oui, par un cabinet d’avocats indépendant", "Oui, mais seulement quand elles citent un article"],
-      "answer": 0,
-      "explanation": "Le panneau « Ses limites » indique que les réponses peuvent être incomplètes, erronées ou dépassées, et qu’elles n’ont pas été validées par un juriste.",
-      "source": {"kind": "app", "document_id": "APP-juriste", "reference": "Panneau « À propos » : « Ses limites »", "quote": "n’ont pas été validées par un juriste"},
-      "check": {"evidence": ["n’ont pas été validées par un juriste"]}
-    },
-    {
-      "id": "assistant-avis",
-      "kind": "assistant",
-      "question": "Une réponse de l’assistant constitue-t-elle un avis juridique ?",
-      "choices": ["Non, ce n’est pas un avis juridique", "Oui, dès qu’elle cite un article", "Oui, quand elle est complète", "Oui, parce qu’elle s’appuie sur un texte officiel"],
-      "answer": 0,
-      "explanation": "Le panneau « Ses limites » est clair : l’assistant ne remplace ni un professionnel du droit ni le texte officiel, et ce n’est pas un avis juridique.",
-      "source": {"kind": "app", "document_id": "APP-avis", "reference": "Panneau « À propos » : « Ses limites »", "quote": "Ce n’est pas un avis juridique"},
-      "check": {"evidence": ["Ce n’est pas un avis juridique"]}
-    },
-    {
-      "id": "assistant-vigueur",
-      "kind": "assistant",
-      "question": "Que dit l’application de la situation actuelle d’un texte (modifié, remplacé ou abrogé) ?",
-      "choices": ["Elle n’est pas garantie", "Elle est toujours à jour", "Elle est vérifiée chaque jour par la Banque d’Algérie", "Elle est garantie pour les textes récents"],
-      "answer": 0,
-      "explanation": "Tous les textes ne sont pas couverts, et l’application ne garantit pas la situation actuelle d’un texte : un texte a pu être modifié, remplacé ou abrogé.",
-      "source": {"kind": "app", "document_id": "APP-vigueur", "reference": "Panneau « À propos » : « Ses limites »", "quote": "la situation actuelle d’un texte (modifié, remplacé, abrogé) n’est pas garantie"},
-      "check": {"evidence": ["la situation actuelle d’un texte (modifié, remplacé, abrogé) n’est pas garantie"]}
-    },
-    {
-      "id": "assistant-donnees",
-      "kind": "assistant",
-      "question": "Sur quelles données cet assistant est-il construit ?",
-      "choices": ["Exclusivement sur des données publiques de la Banque d’Algérie", "Sur des documents internes et confidentiels", "Sur les textes de toutes les banques centrales du monde", "Sur les échanges privés des utilisateurs"],
-      "answer": 0,
-      "explanation": "Il est construit exclusivement à partir de données publiques : les règlements, instructions et notes publiés sur le site de la Banque d’Algérie. Aucun document privé ou confidentiel n’est utilisé.",
-      "source": {"kind": "app", "document_id": "APP-donnees", "reference": "Panneau « À propos » : « Les données »", "quote": "exclusivement à partir de données publiques"},
-      "check": {"evidence": ["exclusivement à partir de données publiques"]}
-    },
-    {
-      "id": "assistant-fait-foi",
-      "kind": "assistant",
-      "question": "Entre la réponse de l’assistant et le PDF officiel d’un texte, lequel fait foi ?",
-      "choices": ["Le texte officiel (PDF)", "La réponse de l’assistant", "Les deux, à égalité", "Celui des deux qui est le plus récent"],
-      "answer": 0,
-      "explanation": "Le bandeau de l’application le dit : seul le texte officiel (PDF) fait foi, pas la réponse rédigée par l’intelligence artificielle.",
-      "source": {"kind": "app", "document_id": "APP-fait-foi", "reference": "Bandeau « Projet éducatif non officiel »", "quote": "Seul le texte officiel (PDF) fait foi"},
-      "check": {"evidence": ["Seul le texte officiel (PDF) fait foi"]}
-    },
-    {
-      "id": "assistant-affiliation",
-      "kind": "assistant",
-      "question": "Cet assistant est-il approuvé par la Banque d’Algérie ?",
-      "choices": ["Non : c’est un projet éducatif non officiel", "Oui : c’est son assistant officiel", "Oui : il est validé par son gouverneur", "Oui, mais seulement pour les textes récents"],
-      "answer": 0,
-      "explanation": "Cet assistant est un projet éducatif non officiel : il n’est affilié ni à la Banque d’Algérie ni à aucune autorité, et n’a été approuvé par aucune d’elles.",
-      "source": {"kind": "app", "document_id": "APP-affiliation", "reference": "Panneau « À propos »", "quote": "n’est affilié ni à la Banque d’Algérie ni à aucune autorité, et n’a été approuvé par aucune d’elles"},
-      "check": {"evidence": ["n’a été approuvé par aucune d’elles"]}
     }
   ]
 }

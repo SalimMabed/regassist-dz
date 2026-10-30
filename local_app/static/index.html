@@ -117,24 +117,40 @@
   </button>
 </div>
 
-<!-- Choix proposé dès l'envoi d'une question (avec la file d'attente) : quiz, jeu, ou simplement attendre -->
+<!-- Fenêtre proposée dès l'envoi d'une question (avec la file d'attente) : quiz, jeu, ou simplement attendre.
+     Le choix fait, la même fenêtre s'agrandit et sert de scène de jeu, avec la progression de la demande en bas. -->
 <div id="offer" class="offer" hidden>
   <div class="offer-panel" role="dialog" aria-modal="true" aria-labelledby="offer-title" tabindex="-1">
-    <h2 id="offer-title" class="offer-title">Votre réponse va être traitée.</h2>
-    <p class="offer-lead">En attendant, vous pouvez :</p>
-    <div class="offer-choices">
-      <button type="button" id="offer-quiz" class="offer-card">
-        <span class="offer-emoji" aria-hidden="true">🧠</span>
-        <span class="offer-name">Répondre à un quiz</span>
-        <span class="offer-desc">Cinq questions sur les textes de la Banque d'Algérie et sur cet assistant.</span>
-      </button>
-      <button type="button" id="offer-game" class="offer-card">
-        <span class="offer-emoji" aria-hidden="true">🎮</span>
-        <span class="offer-name">Jouer à un jeu</span>
-        <span class="offer-desc">Un petit jeu de mémoire, pour passer le temps.</span>
-      </button>
+    <div id="offer-choose" class="offer-choose">
+      <h2 id="offer-title" class="offer-title">Votre réponse va être traitée.</h2>
+      <p class="offer-lead">En attendant, vous pouvez :</p>
+      <div class="offer-choices">
+        <button type="button" id="offer-quiz" class="offer-card">
+          <span class="offer-emoji" aria-hidden="true">🧠</span>
+          <span class="offer-name">Répondre à un quiz</span>
+          <span class="offer-desc">Cinq questions très simples sur la monnaie, la Banque d'Algérie et cet assistant.</span>
+        </button>
+        <button type="button" id="offer-game" class="offer-card">
+          <span class="offer-emoji" aria-hidden="true">🎮</span>
+          <span class="offer-name">Jouer à un jeu</span>
+          <span class="offer-desc">Un petit jeu de mémoire, pour passer le temps.</span>
+        </button>
+      </div>
+      <button type="button" id="offer-none" class="offer-none">Aucun des deux, juste attendre</button>
     </div>
-    <button type="button" id="offer-none" class="offer-none">Aucun des deux, juste attendre</button>
+    <div id="offer-play" class="offer-play" hidden>
+      <div class="offer-play-head">
+        <h2 id="offer-play-title" class="offer-play-title"><span class="offer-play-emoji" data-kind="quiz" aria-hidden="true">🧠</span><span class="offer-play-emoji" data-kind="game" aria-hidden="true" hidden>🎮</span><span id="offer-play-name">Quiz</span></h2>
+        <button type="button" id="offer-close" class="btn btn-ghost">Fermer</button>
+      </div>
+      <div id="offer-stage" class="offer-stage"></div>
+      <div id="offer-progress" class="offer-progress">
+        <div class="offer-prog-bar" aria-hidden="true"><i></i><i></i><i></i><i></i></div>
+        <p id="offer-prog-step" class="offer-prog-step"></p>
+        <p id="offer-prog-detail" class="offer-prog-detail"></p>
+        <p id="offer-prog-live" class="sr-only" role="status"></p>
+      </div>
+    </div>
   </div>
 </div>
 

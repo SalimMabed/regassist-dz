@@ -21,9 +21,9 @@ function seeded(seed) { let s = seed >>> 0; return () => { s = (s * 1664525 + 10
 class Mem { constructor() { this.m = {}; } getItem(k) { return k in this.m ? this.m[k] : null; } setItem(k, v) { this.m[k] = String(v); } }
 
 test('banque : fichier de données chargé, figé, 5 questions au moins, chaque question complète et référencée', () => {
-  assert.ok(Object.isFrozen(DATA) && BANK.length >= 15);
+  assert.ok(Object.isFrozen(DATA) && BANK.length >= 18);
   for (const q of BANK) {
-    assert.ok(q.question && q.explanation && q.choices.length >= 3 && q.choices.length <= 4 && q.answer >= 0 && q.answer < q.choices.length, q.id);
+    assert.ok(q.question && q.explanation && q.choices.length >= 2 && q.choices.length <= 3 && q.answer >= 0 && q.answer < q.choices.length, q.id);
     assert.ok(q.source.title && q.source.quote && q.source.reference, q.id);
     if (q.kind === 'assistant') { assert.ok(q.source.type === 'application' && q.source.url === null && q.source.page === null, 'source = texte de l\'application, sans PDF : ' + q.id); continue; }
     assert.ok(q.source.page >= 1, q.id);
@@ -31,12 +31,13 @@ test('banque : fichier de données chargé, figé, 5 questions au moins, chaque 
   }
 });
 
-test('série : 5 questions distinctes, textes distincts, types variés, au moins une question sur un article et une sur l\'assistant', () => {
+test('série : 5 questions distinctes, au plus deux du même texte, types variés, au moins une question sur un article et une sur l\'assistant', () => {
   for (let seed = 1; seed <= 60; seed++) {
     const s = L.pickSession(BANK, { random: seeded(seed) });
     assert.equal(s.length, 5, 'seed ' + seed);
     assert.equal(new Set(s.map((i) => i.question.id)).size, 5);
-    assert.equal(new Set(s.map((i) => i.question.source.document_id)).size, 5, 'jamais deux fois le même texte');
+    const perDoc = {}; s.forEach((i) => { const d = i.question.source.document_id; perDoc[d] = (perDoc[d] || 0) + 1; });
+    assert.ok(Math.max(...Object.values(perDoc)) <= 2, 'au plus deux questions du même texte : ' + JSON.stringify(perDoc));
     assert.ok(s.some((i) => i.question.kind === 'contenu'), 'une question sur le contenu d\'un article');
     assert.ok(s.some((i) => i.question.kind === 'assistant'), 'une question sur l\'assistant (IA, limites, valeur juridique)');
     const kinds = {}; s.forEach((i) => { kinds[i.question.kind] = (kinds[i.question.kind] || 0) + 1; });
@@ -64,7 +65,7 @@ test('série : déterministe pour un même tirage, différente d\'un tirage à l
 });
 
 test('questions jamais vues d\'abord ; quand tout a été vu, la série reste possible', () => {
-  const want = ['loi-23-09-art-01-centimes', 'reg-23-01-objet', 'reg-20-01-date', 'reg-26-01-numero', 'assistant-formation'];
+  const want = ['loi-23-09-art-01-centimes', 'loi-23-09-art-11-siege', 'reg-26-01-art-02-presidence', 'assistant-formation', 'assistant-avis'];
   const seen = BANK.map((q) => q.id).filter((id) => !want.includes(id));
   assert.deepEqual(L.pickSession(BANK, { random: seeded(3), seen }).map((i) => i.question.id).sort(), want.slice().sort());
   assert.equal(L.pickSession(BANK, { random: seeded(3), seen: BANK.map((q) => q.id) }).length, 5);
