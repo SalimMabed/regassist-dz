@@ -79,7 +79,7 @@ test('envoi d\'une question : affichage du traitement, de la réponse et des sou
   assert.match(await text('#answer .callout-after'), /Correspondance partielle/);
   assert.equal(await exists('#answer .timings'), false, 'plus de durées affichées');
   assert.equal(await exists('#answer .timing-badge'), false, 'aucun badge technique de timing');
-  assert.match(await text('#answer .ans-label'), /Réponse rédigée par une intelligence artificielle uniquement à partir des sources ci-contre/);
+  assert.match(await text('#answer .ans-label'), /Réponse rédigée par une intelligence artificielle uniquement à partir des sources listées avec elle\. Elle peut contenir des erreurs : vérifiez chaque citation dans le texte officiel \(PDF\)/);
   await assertNoTechnicalDetail('réponse');
   assert.match(await text('#answer .disclaimer'), /ne constitue pas un avis juridique/);
   assert.equal(await ev(`document.getElementById('question').value`), '');
@@ -567,6 +567,166 @@ test('double envoi : un seul dépôt ; après une coupure, le nouvel essai réut
   assert.match(keys[0], /^[A-Za-z0-9_-]{16,64}$/);
 });
 
+
+/* ---------- refonte de l'interface : la réponse d'abord, saisie hors de la zone qui défile, accueil, tiroir, signal « réponse prête » ---------- */
+const rect = (sel) => ev(`(() => { const r = document.querySelector(${JSON.stringify(sel)}).getBoundingClientRect(); return { l: r.left, t: r.top, r: r.right, b: r.bottom, w: r.width, h: r.height }; })()`);
+const phone = (w = 390, h = 844) => send('Emulation.setDeviceMetricsOverride', { width: w, height: h, deviceScaleFactor: 1, mobile: true });
+const desktop = () => send('Emulation.clearDeviceMetricsOverride');
+const answeredQ = (re) => waitFor(`document.querySelector('#answer .ans-text') && !document.getElementById('answer').hasAttribute('aria-busy') && ${re}.test(document.querySelector('#question-echo .q-text').textContent)`, 'réponse à la question attendue');
+
+test('accueil : titre, trois questions d\'exemple utilisables, trois étapes, bandeau complet ; la conversation prend ensuite la place de l\'accueil', async () => {
+  await fresh();
+  assert.equal(await ev(`document.getElementById('workspace').classList.contains('is-empty')`), true);
+  assert.match(await text('.welcome-title'), /Que cherchez-vous dans les textes de la Banque d'Algérie/);
+  assert.equal(await ev(`getComputedStyle(document.querySelector('.welcome')).display`), 'block');
+  assert.equal(await ev(`[...document.querySelectorAll('.chip')].every((c) => c.getBoundingClientRect().height > 40 && !c.disabled)`), true, 'puces visibles, assez hautes, utilisables');
+  assert.equal(await count('.welcome-steps li'), 3);
+  assert.equal(await ev(`getComputedStyle(document.querySelector('.thread')).display`), 'none', 'pas de zone de réponse vide à l\'accueil');
+  assert.equal(await ev(`document.querySelector('.notice-short').offsetParent`), null, 'à l\'accueil, le bandeau complet est affiché, pas sa version courte');
+  await ask('plafond'); await waitFor(`document.querySelector('#answer .ans-text')`, 'réponse');
+  assert.equal(await ev(`getComputedStyle(document.querySelector('.welcome')).display`), 'none', 'l\'accueil laisse la place à la conversation');
+  assert.equal(await count('.chip'), 3, 'les puces restent dans la page, seulement masquées');
+});
+
+test('la réponse d\'abord : grande carte au premier plan, sources dans une colonne plus étroite et plus discrète, saisie hors de la zone qui défile', async () => {
+  await fresh();
+  await ask('plafond'); await waitFor(`document.querySelector('#answer .ans-text')`, 'réponse');
+  const a = await rect('.pane-answer'), s = await rect('.pane-sources'), q = await rect('#question-echo .q-text'), panes = await rect('.panes');
+  assert.ok(a.l < s.l, 'la réponse est avant les sources');
+  assert.ok(a.w > s.w * 1.4, `la réponse est la plus large : ${a.w} contre ${s.w}`);
+  assert.ok(Math.abs(q.r - panes.r) < 2, 'la question de l\'utilisateur est alignée à droite, la réponse à gauche');
+  const f = await ev(`(() => { const g = (sel) => getComputedStyle(document.querySelector(sel)); const t = g('#answer .ans-text'); return { ans: parseFloat(t.fontSize), lh: parseFloat(t.lineHeight) / parseFloat(t.fontSize), width: document.querySelector('#answer .ans-text').getBoundingClientRect().width, src: parseFloat(g('#sources .src-title').fontSize), family: t.fontFamily }; })()`);
+  assert.ok(f.ans >= 17, 'texte de la réponse assez grand : ' + f.ans); assert.ok(f.lh >= 1.6, 'interligne confortable : ' + f.lh);
+  assert.ok(f.width <= 760, 'largeur de lecture limitée : ' + f.width); assert.ok(f.src < f.ans, 'les sources sont typographiquement plus discrètes que la réponse');
+  const dock = await rect('.composer-dock'), scroll = await rect('#scroll');
+  assert.ok(scroll.b <= dock.t + 1, 'la saisie ne recouvre jamais la zone de contenu (' + scroll.b + ' > ' + dock.t + ')');
+  await ev(`document.querySelector('.pane-sources .pane-body').scrollIntoView()`);
+  assert.equal(await ev(`document.getElementById('scroll').scrollHeight >= document.getElementById('scroll').clientHeight`), true);
+});
+
+test('téléphone : la réponse est visible dès le premier écran et au-dessus des sources, bandeau compact, saisie collée en bas, aucun débordement', async () => {
+  await phone();
+  try {
+    await fresh();
+    assert.equal(await ev(`!!document.querySelector('.notice-full').offsetParent`), true, 'à l\'accueil, texte complet de la mise en garde');
+    await ask('plafond'); await waitFor(`document.querySelector('#answer .ans-text')`, 'réponse');
+    const m = await ev(`({ sw: document.documentElement.scrollWidth, iw: innerWidth, vh: innerHeight, ansTop: document.querySelector('#answer .ans-text').getBoundingClientRect().top, srcTop: document.querySelector('.pane-sources').getBoundingClientRect().top,
+      dockBottom: document.querySelector('.composer-dock').getBoundingClientRect().bottom, short: !!document.querySelector('.notice-short').offsetParent, full: !!document.querySelector('.notice-full').offsetParent })`);
+    assert.ok(m.sw <= m.iw + 1, `défilement horizontal : ${m.sw} > ${m.iw}`);
+    assert.ok(m.ansTop < m.vh * 0.6, 'le texte de la réponse est dans la moitié haute du premier écran : ' + m.ansTop + ' / ' + m.vh);
+    assert.ok(m.ansTop < m.srcTop, 'réponse au-dessus des sources');
+    assert.ok(Math.abs(m.dockBottom - m.vh) <= 2, 'la saisie est collée au bas de l\'écran');
+    assert.equal(m.short, true); assert.equal(m.full, false);
+    assert.match(await ev(`document.querySelector('.notice-short').innerText`), /non officiel.*non validées par un juriste.*seul le texte officiel \(PDF\) fait foi/s, 'la version courte garde l\'essentiel de la mise en garde');
+    await ev(`document.getElementById('notice-more').click()`);
+    await waitFor(`!document.getElementById('about-panel').hidden`, '« Texte complet » ouvre « À propos »');
+    assert.match(await text('#about-panel'), /n'a pas été entraînée ni spécialisée sur ces textes/);
+  } finally { await desktop(); }
+});
+
+test('téléphone : l\'historique est un tiroir fermé par défaut ; menu, Échap, voile ou choix d\'une question le gèrent', async () => {
+  await phone();
+  try {
+    await fresh();
+    await ask('plafond'); await waitFor(`document.querySelector('#answer .ans-text')`, 'réponse');
+    const vis = () => ev(`getComputedStyle(document.getElementById('history')).visibility`);
+    assert.equal(await vis(), 'hidden', 'tiroir fermé par défaut (hors de la navigation au clavier)');
+    assert.equal(await ev(`Math.round(document.getElementById('btn-menu').getBoundingClientRect().width)`) >= 44, true, 'bouton menu assez grand pour le toucher');
+    await ev(`document.getElementById('btn-menu').click()`);
+    await waitFor(`getComputedStyle(document.getElementById('history')).visibility === 'visible'`, 'tiroir ouvert');
+    assert.equal(await ev(`document.getElementById('btn-menu').getAttribute('aria-expanded')`), 'true');
+    assert.equal(await ev(`document.getElementById('scrim').hidden`), false);
+    await ev(`document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }))`);
+    await waitFor(`getComputedStyle(document.getElementById('history')).visibility === 'hidden'`, 'fermeture par Échap');
+    await ev(`document.getElementById('btn-menu').click()`); await waitFor(`getComputedStyle(document.getElementById('history')).visibility === 'visible'`, 'réouverture');
+    await ev(`document.getElementById('scrim').click()`); await waitFor(`getComputedStyle(document.getElementById('history')).visibility === 'hidden'`, 'fermeture par le voile');
+    await ev(`document.getElementById('btn-menu').click()`); await waitFor(`getComputedStyle(document.getElementById('history')).visibility === 'visible'`, 'réouverture');
+    await ev(`document.querySelector('.hist-item').click()`);
+    await waitFor(`getComputedStyle(document.getElementById('history')).visibility === 'hidden'`, 'fermeture au choix d\'une question');
+    assert.equal(await ev(`document.getElementById('btn-menu').getAttribute('aria-expanded')`), 'false');
+    assert.match(await text('#question-echo .q-text'), /plafond/);
+  } finally { await desktop(); }
+});
+
+test('réponse prête : si un panneau recouvre la réponse à son arrivée, un message l\'annonce ; « Lire la réponse » l\'amène à l\'écran ; sinon aucun message', async () => {
+  await fresh();
+  await ask('plafond première');
+  await ev(`document.getElementById('btn-about').click()`);
+  await answeredQ('/première/'); await waitFor(`!document.getElementById('toast').hidden`, 'message « réponse prête »');
+  assert.match(await text('#toast .toast-text'), /Votre réponse est prête/);
+  await ev(`document.getElementById('toast-go').click()`);
+  assert.equal(await ev(`document.getElementById('about-panel').hidden`), true, 'le panneau est refermé');
+  assert.equal(await ev(`document.getElementById('toast').hidden`), true);
+  assert.equal(await ev(`document.activeElement === document.getElementById('answer')`), true, 'le focus est sur la réponse (lecteurs d\'écran)');
+  await ask('plafond seconde'); await answeredQ('/seconde/');
+  assert.equal(await ev(`document.getElementById('toast').hidden`), true, 'la réponse est déjà à l\'écran : aucun message');
+});
+
+test('animations : à l\'arrivée la carte de réponse se révèle ; avec « mouvement réduit », rien ne bouge', async () => {
+  const media = (v) => send('Emulation.setEmulatedMedia', { features: [{ name: 'prefers-reduced-motion', value: v }] });
+  try {
+    await media('no-preference'); await fresh();
+    await ask('plafond'); await waitFor(`document.querySelector('#answer .ans-text')`, 'réponse');
+    const names = await ev(`getComputedStyle(document.querySelector('.pane-answer')).animationName`);
+    assert.match(names, /rise/); assert.match(names, /ready-glow/);
+    await media('reduce'); await fresh();
+    await ask('plafond'); await waitFor(`document.querySelector('#answer .ans-text')`, 'réponse');
+    assert.equal(await ev(`getComputedStyle(document.querySelector('.pane-answer')).animationName`), 'none');
+    assert.equal(await ev(`getComputedStyle(document.querySelector('.question-echo')).animationName`), 'none');
+    assert.equal(await ev(`getComputedStyle(document.querySelector('.chip')).transitionDuration`), '0s', 'aucune transition non plus');
+  } finally { await send('Emulation.setEmulatedMedia', { features: [] }); }
+});
+
+test('saisie : le champ grandit avec le texte (plafonné) puis revient à une ligne', async () => {
+  await fresh();
+  const h = () => ev(`Math.round(document.getElementById('question').getBoundingClientRect().height)`);
+  const set = (v) => ev(`(() => { const t = document.getElementById('question'); t.value = ${JSON.stringify(v)}; t.dispatchEvent(new Event('input', { bubbles: true })); })()`);
+  const h0 = await h();
+  await set('une ligne\nune autre\net une troisième'); const h1 = await h();
+  assert.ok(h1 > h0 + 30, `le champ grandit : ${h0} → ${h1}`);
+  await set('ligne\n'.repeat(40)); const h2 = await h();
+  assert.ok(h2 <= 176 && h2 > h1, `le champ est plafonné : ${h2}`);
+  await set(''); assert.equal(await h(), h0, 'une ligne de nouveau');
+});
+
+test('très petit téléphone (320 px) : aucun défilement horizontal, saisie et envoi utilisables, noms accessibles pour chaque bouton', async () => {
+  await phone(320, 640);
+  try {
+    await fresh();
+    await ask('GROUPES plafond'); await waitFor(`document.querySelector('#answer .texts')`, 'réponse avec textes');
+    const m = await ev(`({ sw: document.documentElement.scrollWidth, iw: innerWidth, send: document.getElementById('btn-send').getBoundingClientRect().width, noName: [...document.querySelectorAll('button')].filter((b) => !(b.textContent.trim() || b.getAttribute('aria-label') || b.title)).length })`);
+    assert.ok(m.sw <= m.iw + 1, `défilement horizontal : ${m.sw} > ${m.iw}`);
+    assert.ok(m.send >= 44, 'bouton d\'envoi assez grand : ' + m.send);
+    assert.equal(m.noName, 0, 'tout bouton a un nom accessible');
+  } finally { await desktop(); }
+});
+
+test('contraste (WCAG AA, 4,5:1) des textes principaux, en thème clair et en thème sombre', async () => {
+  const media = (v) => send('Emulation.setEmulatedMedia', { features: [{ name: 'prefers-color-scheme', value: v }] });
+  const measure = () => ev(`(() => {
+    const parse = (s) => { const m = s.match(/[\\d.]+/g).map(Number); return { r: m[0], g: m[1], b: m[2], a: m.length > 3 ? m[3] : 1 }; };
+    const over = (top, under) => ({ r: top.r * top.a + under.r * (1 - top.a), g: top.g * top.a + under.g * (1 - top.a), b: top.b * top.a + under.b * (1 - top.a), a: 1 });
+    const bg = (el) => { const chain = []; for (let n = el; n; n = n.parentElement) chain.push(parse(getComputedStyle(n).backgroundColor)); let c = { r: 255, g: 255, b: 255, a: 1 }; for (const x of chain.reverse()) c = over(x, c); return c; };
+    const L = (c) => { const f = (v) => { v /= 255; return v <= 0.03928 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4); }; return 0.2126 * f(c.r) + 0.7152 * f(c.g) + 0.0722 * f(c.b); };
+    const ratio = (el) => { const fg = over(parse(getComputedStyle(el).color), bg(el)); const a = L(fg), b = L(bg(el)); return (Math.max(a, b) + 0.05) / (Math.min(a, b) + 0.05); };
+    const sels = ['.brand-title', '.brand-sub', '.badge-edu', '.notice-full', '#history-hint', '.conv-head', '.hist-item', '.pane-answer .pane-title', '#answer .ans-text', '#answer .tags .tag-neutral', '#answer .tags .tag-warn',
+      '#answer .cite', '#answer .cited-list', '#answer .callout-warn', '#answer .ans-label', '#answer .disclaimer', '.pane-sources .pane-title', '.pane-sub', '#sources .src-ref', '#sources .src-title', '#sources .src-meta dt',
+      '#sources .src-meta dd', '#sources .excerpt', '#sources .tag', '#sources .src-cited', '.persist-note', '.counter', '.footer', '.question-echo .q-text', '#btn-send', '.btn-link'];
+    return sels.map((s) => { const el = document.querySelector(s); return el ? [s, Math.round(ratio(el) * 100) / 100] : [s, null]; });
+  })()`);
+  try {
+    for (const theme of ['light', 'dark']) {
+      await media(theme); await fresh();
+      await ask('plafond'); await waitFor(`document.querySelector('#answer .ans-text')`, 'réponse');
+      const rows = await measure();
+      const missing = rows.filter(([, r]) => r === null).map(([s]) => s);
+      assert.deepEqual(missing, [], theme + ' : éléments introuvables');
+      const low = rows.filter(([s, r]) => r < 4.5 && s !== '#btn-send').map(([s, r]) => `${s}=${r}`);
+      assert.deepEqual(low, [], theme + ' : contraste insuffisant (< 4,5:1)');
+      const send_ = rows.find(([s]) => s === '#btn-send')[1]; assert.ok(send_ >= 3, theme + ' : bouton Envoyer (désactivé en fin de réponse) : ' + send_);
+    }
+  } finally { await send('Emulation.setEmulatedMedia', { features: [] }); }
+});
 
 test('aucune ressource externe : toutes les requêtes du navigateur visent l\'application, aucune violation CSP, aucune exception', async () => {
   const foreign = requests.filter((u) => !(u.startsWith(ORIGIN + '/') || (URL_OFF && u.startsWith(new URL(URL_OFF).origin + '/')) || (URL_PERSIST && u.startsWith(new URL(URL_PERSIST).origin + '/')) || u.startsWith('data:') || u === 'about:blank'));

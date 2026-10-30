@@ -7,7 +7,7 @@ Technique : HTML + CSS + JavaScript sans dépendance, sans CDN, sans police ni i
 ## 1. Ce que dit clairement l'interface
 
 * **En-tête** : pastille « PROJET ÉDUCATIF · NON OFFICIEL ».
-* **Bandeau permanent** : projet éducatif non officiel ; ni affilié à la Banque d'Algérie ni approuvé par elle ; construit exclusivement à partir de textes publics publiés sur son site ; réponses rédigées par une intelligence artificielle, pouvant être incomplètes ou erronées, **non validées par un juriste**, ne constituant pas un avis juridique ; seul le texte officiel (PDF) fait foi.
+* **Bandeau permanent** : projet éducatif non officiel ; ni affilié à la Banque d'Algérie ni approuvé par elle ; construit exclusivement à partir de textes publics publiés sur son site ; réponses rédigées par une intelligence artificielle, pouvant être incomplètes ou erronées, **non validées par un juriste**, ne constituant pas un avis juridique ; seul le texte officiel (PDF) fait foi. Il défile avec le contenu et reste affiché en entier à l'accueil. **Sur écran étroit (< 900 px), une fois la conversation commencée, il passe en version courte** (« Projet éducatif non officiel. Réponses rédigées par une IA, non validées par un juriste et sans valeur d'avis juridique : seul le texte officiel (PDF) fait foi. ») afin que la réponse reste en haut de l'écran ; le bouton « Texte complet » ouvre « À propos », qui dit tout le reste. La pastille « PROJET ÉDUCATIF · NON OFFICIEL » de la barre supérieure et le pied de page restent visibles.
 * **Pied de page** : rappel en une ligne (projet éducatif non officiel · données publiques de la Banque d'Algérie · réponses rédigées par une IA à vérifier · pas un avis juridique).
 * **Bouton « À propos »** : projet, données (publiques uniquement), fonctionnement, limites, vie privée (l'application ne conserve pas le texte des questions ; l'historique reste dans le navigateur et s'efface à volonté).
 
@@ -21,20 +21,24 @@ Ce qui est conservé parce que c'est utile pour lire et vérifier : sources et e
 
 ## 3. Disposition
 
+Principe : **la réponse d'abord, les sources ensuite**. L'interface est une coque d'application : seule la zone centrale défile, la saisie est en dehors de cette zone et ne peut donc recouvrir aucun contenu.
+
 | Zone | Contenu |
 |---|---|
-| Colonne de gauche | « Nouvelle conversation », historique des questions, « Effacer l'historique » |
-| Zone centrale | rappel de la question, puis **Sources** (à gauche) et **Réponse** (à droite) |
-| Bas de page | saisie (Entrée envoie, Maj+Entrée = retour à la ligne), compteur `n / 500`, « Envoyer » ; message simple si le service est indisponible |
+| Barre supérieure | marque, titre, pastille « PROJET ÉDUCATIF · NON OFFICIEL », « À propos » ; bouton menu (historique) sur écran étroit |
+| Volet de gauche | « Nouvelle conversation », historique des questions, « Effacer l'historique » ; **tiroir** sur écran étroit (< 900 px) : fermé par défaut, ouvert par le bouton menu, fermé par Échap, par le voile ou par le choix d'une question |
+| Zone centrale, **accueil** (rien n'est affiché) | titre, trois questions d'exemple (cartes), trois étapes « comment ça marche » |
+| Zone centrale, **conversation** | la question de l'utilisateur (bulle à droite), puis la **carte de réponse** au premier plan, puis les **sources** : colonne latérale plus étroite et plus discrète à partir de 1280 px, section sous la réponse en dessous |
+| Bas de page | saisie (Entrée envoie, Maj+Entrée = retour à la ligne ; le champ grandit avec le texte, plafonné), compteur `n / 500`, « Envoyer » (bouton rond sur téléphone) ; message simple si le service est indisponible |
 
-Sur écran étroit (< 800 px), les volets s'empilent, sans défilement horizontal.
+Sur téléphone : saisie collée au bas de l'écran (hauteur suivant le clavier tactile), cibles tactiles d'au moins 44 px, aucun défilement horizontal (vérifié jusqu'à 320 px), mention de conservation de la question affichée dès que la saisie est active.
 
 ## 4. Parcours d'une question
 
 1. L'utilisateur saisit 3 à 500 caractères.
 2. Le navigateur envoie la question à l'application (même origine), qui l'applique **telle quelle** au système gelé (recherche dans les textes, rédaction par l'IA).
-3. Pendant le traitement : « Recherche dans les textes puis rédaction de la réponse. Cela peut prendre jusqu'à une minute… » avec un compteur de secondes. Il n'y a pas de flux : sources et réponse apparaissent ensemble.
-4. Le résultat est affiché et ajouté à l'historique de ce navigateur. Chaque question est traitée **indépendamment** des précédentes.
+3. Pendant le traitement : la fiche de suivi (étapes réelles, lien personnel, notification facultative, mini-jeu) quand la file d'attente est active, sinon « Recherche dans les textes puis rédaction de la réponse. Cela peut prendre jusqu'à deux minutes… » avec un compteur de secondes et des lignes d'attente décoratives. Aucune étape n'est inventée : la frise reflète l'état réel donné par le serveur. Il n'y a pas de flux : sources et réponse apparaissent ensemble.
+4. Le résultat est affiché et ajouté à l'historique de ce navigateur. La carte de réponse se révèle par une légère animation (apparition et halo vert d'environ 2 s). **Si la réponse n'est pas visible à son arrivée** (panneau « À propos » ou tiroir de l'historique ouvert, zone défilée), un message « Votre réponse est prête » avec le bouton « Lire la réponse » apparaît en haut de l'écran ; en onglet masqué, le titre de l'onglet le signale et la notification facultative prend le relais. Chaque question est traitée **indépendamment** des précédentes (pas de mémoire de conversation : l'affichage est celui d'une question et de sa réponse, pas d'un fil continu).
 
 ## 5. Affichage des sources
 
@@ -57,7 +61,7 @@ Jamais affichés : scores et similarités internes. Un score interne n'est pas u
 
 | Situation | Affichage |
 |---|---|
-| **Réponse rédigée** | mention « rédigée par une intelligence artificielle uniquement à partir des sources ci-contre… vérifiez chaque citation dans le texte officiel (PDF) » ; pastille « n avertissement(s) » ; texte avec citations `[S1]` cliquables ; encadré jaune « À vérifier avant tout usage » avec toutes les notes ; avertissement juridique |
+| **Réponse rédigée** | en tête de carte, pastille « Rédigée par une IA : à vérifier » et, s'il y en a, pastille « n avertissement(s) à lire sous la réponse » ; texte de la réponse (serif, grande taille, largeur de lecture limitée) avec citations `[S1]` cliquables ; « Sources citées » ; encadré jaune « À vérifier avant tout usage » avec toutes les notes ; **en pied de la même carte**, la mention complète « rédigée par une intelligence artificielle uniquement à partir des sources listées avec elle… vérifiez chaque citation dans le texte officiel (PDF) » ; avertissement juridique |
 | **Pas de réponse directe mais des textes retrouvés** (rédaction impossible, ou refus de l'IA) | « **Je ne peux pas répondre directement, mais voici quelques textes qui pourraient vous aider à trouver la réponse :** », puis chaque texte décrit (référence en gras suivie de l'intitulé officiel, type, date, passages cliquables, statut, relations, liens), puis « Pourquoi pas de réponse directe » avec une cause, en langage courant |
 | Aucun texte retrouvé (refus de la recherche) | encadré « Aucune réponse établie » + phrase de refus du système + rappel que cela ne prouve pas l'absence de disposition |
 | Question ambiguë | encadré « Précision nécessaire » |
@@ -74,7 +78,9 @@ Stocké dans le **localStorage de ce navigateur** (clé `regassist.history.v1`) 
 
 ## 8. Accessibilité
 
-Libellés associés aux champs, zones `aria-live` pour les réponses, focus visible, clavier (Entrée, Maj+Entrée, Échap pour fermer « À propos »), contraste élevé, aucune animation, aucun emoji, polices système, fonctionne sans Internet.
+Libellés associés aux champs, lien d'évitement vers la saisie, zones `aria-live` pour les réponses, focus visible, focus amené sur la réponse par « Lire la réponse », clavier (Entrée, Maj+Entrée, Échap pour fermer « À propos », le tiroir de l'historique ou le message « réponse prête »), noms accessibles pour tous les boutons, **contraste WCAG AA (4,5:1) vérifié automatiquement pour les textes principaux en thème clair et en thème sombre**, aucun emoji, polices système, fonctionne sans Internet.
+
+**Animations** : discrètes, limitées à l'opacité et à la transformation (apparition de la carte de réponse et halo vert, lignes d'attente, point de l'étape en cours, apparition du message « réponse prête », survol des cartes d'exemple). **Toutes sont coupées** quand le système demande moins de mouvement (`prefers-reduced-motion: reduce`), y compris les transitions et le défilement animé ; un test le vérifie.
 
 ## 9. Limites connues
 

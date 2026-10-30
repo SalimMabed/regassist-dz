@@ -2,7 +2,8 @@
 <html lang="fr">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, interactive-widget=resizes-content">
+<meta name="theme-color" content="#10294B">
 <title>Assistant juridique - projet éducatif non officiel</title>
 <link rel="icon" href="favicon.ico" sizes="16x16 32x32 48x48">
 <link rel="icon" href="favicon.svg" type="image/svg+xml">
@@ -10,10 +11,18 @@
 <link rel="stylesheet" href="app.css">
 </head>
 <body>
+<a class="skip-link" href="#question">Aller à la zone de saisie</a>
+
 <header class="topbar">
+  <button type="button" id="btn-menu" class="icon-btn" aria-expanded="false" aria-controls="history" aria-label="Ouvrir l'historique des questions">
+    <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><line x1="4" y1="7" x2="20" y2="7"/><line x1="4" y1="12" x2="20" y2="12"/><line x1="4" y1="17" x2="14" y2="17"/></svg>
+  </button>
   <div class="brand">
-    <span class="brand-title">ASSISTANT JURIDIQUE</span>
-    <span class="brand-sub">Textes réglementaires publics de la Banque d'Algérie</span>
+    <img class="brand-mark" src="favicon.svg" alt="" width="34" height="34">
+    <div class="brand-text">
+      <span class="brand-title">ASSISTANT JURIDIQUE</span>
+      <span class="brand-sub">Textes réglementaires publics de la Banque d'Algérie</span>
+    </div>
   </div>
   <div class="topbar-right">
     <span class="badge-edu">PROJET ÉDUCATIF · NON OFFICIEL</span>
@@ -21,14 +30,8 @@
   </div>
 </header>
 
-<div id="notice" class="notice" role="note">
-  <strong>Projet éducatif non officiel.</strong> Cet assistant n'est ni affilié à la Banque d'Algérie ni approuvé par elle. Il est construit exclusivement à partir de textes publics publiés sur son site.
-  Ses réponses, rédigées par une intelligence artificielle, peuvent être incomplètes ou erronées, n'ont pas été validées par un juriste et ne constituent pas un avis juridique.
-  Seul le texte officiel (PDF) fait foi.
-</div>
-
 <div class="layout">
-  <aside class="history" aria-label="Historique des questions">
+  <aside id="history" class="history" aria-label="Historique des questions">
     <button type="button" id="btn-new" class="btn btn-primary btn-block">Nouvelle conversation</button>
     <div id="history-list" class="history-list"></div>
     <div class="history-foot">
@@ -36,47 +39,83 @@
       <p id="history-hint" class="hint">Votre historique est enregistré uniquement dans ce navigateur. Chaque question est traitée indépendamment des précédentes.</p>
     </div>
   </aside>
+  <div id="scrim" class="scrim" hidden></div>
 
-  <main class="workspace">
-    <div id="question-echo" class="question-echo" hidden></div>
-    <div class="panes">
-      <section class="pane" aria-labelledby="h-sources">
-        <h2 id="h-sources" class="pane-title">Sources</h2>
-        <div id="sources" class="pane-body"></div>
-      </section>
-      <section class="pane" aria-labelledby="h-answer">
-        <h2 id="h-answer" class="pane-title">Réponse</h2>
-        <div id="answer" class="pane-body" aria-live="polite"></div>
-      </section>
+  <main id="workspace" class="workspace is-empty">
+    <h1 class="sr-only">Assistant juridique : questions sur les textes réglementaires de la Banque d'Algérie</h1>
+    <div id="scroll" class="scroll">
+      <div class="scroll-inner">
+        <div id="notice" class="notice" role="note">
+          <span class="notice-full"><strong>Projet éducatif non officiel.</strong> Cet assistant n'est ni affilié à la Banque d'Algérie ni approuvé par elle. Il est construit exclusivement à partir de textes publics publiés sur son site.
+          Ses réponses, rédigées par une intelligence artificielle, peuvent être incomplètes ou erronées, n'ont pas été validées par un juriste et ne constituent pas un avis juridique.
+          Seul le texte officiel (PDF) fait foi.</span>
+          <span class="notice-short"><strong>Projet éducatif non officiel.</strong> Réponses rédigées par une IA, non validées par un juriste et sans valeur d'avis juridique : seul le texte officiel (PDF) fait foi. <button type="button" id="notice-more" class="link-btn">Texte complet</button></span>
+        </div>
+
+        <section class="welcome" aria-labelledby="welcome-title">
+          <img class="welcome-mark" src="favicon.svg" alt="" width="60" height="60">
+          <h2 id="welcome-title" class="welcome-title">Que cherchez-vous dans les textes de la Banque d'Algérie ?</h2>
+          <p class="welcome-lead">Posez votre question en langage courant. L'assistant retrouve les passages officiels concernés, rédige une réponse à partir de ces seuls passages, puis vous montre où la vérifier.</p>
+          <div class="example-chips" role="region" aria-label="Questions d'exemple">
+            <span class="example-chips-title">Pour commencer, essayez une question d'exemple</span>
+            <div class="chips-list">
+              <button type="button" class="chip" data-question="Quel est le plafond d'indemnisation par déposant ?">Quel est le plafond d'indemnisation par déposant ?</button>
+              <button type="button" class="chip" data-question="Une banque peut-elle appliquer des conditions moins favorables que celles qu'elle a affichées ?">Une banque peut-elle appliquer des conditions moins favorables que celles qu'elle a affichées ?</button>
+              <button type="button" class="chip" data-question="Que dit l'article 3 ?">Que dit l'article 3 ?</button>
+            </div>
+          </div>
+          <ol class="welcome-steps">
+            <li><span class="step-n" aria-hidden="true">1</span><div><strong>Vous posez une question</strong><span>sur un texte, un article ou un sujet précis.</span></div></li>
+            <li><span class="step-n" aria-hidden="true">2</span><div><strong>Les textes officiels sont retrouvés</strong><span>règlements, instructions et notes publiés par la Banque d'Algérie.</span></div></li>
+            <li><span class="step-n" aria-hidden="true">3</span><div><strong>Vous lisez, puis vous vérifiez</strong><span>la réponse indique ses sources et renvoie au PDF officiel.</span></div></li>
+          </ol>
+        </section>
+
+        <div class="thread">
+          <div id="question-echo" class="question-echo" hidden></div>
+          <div class="panes">
+            <section class="pane pane-answer" aria-labelledby="h-answer">
+              <h2 id="h-answer" class="pane-title">Réponse</h2>
+              <div id="answer" class="pane-body" aria-live="polite"></div>
+            </section>
+            <section class="pane pane-sources" aria-labelledby="h-sources">
+              <h2 id="h-sources" class="pane-title">Sources</h2>
+              <div id="sources" class="pane-body"></div>
+            </section>
+          </div>
+        </div>
+
+        <footer class="footer">
+          <span>Projet éducatif non officiel</span><span class="sep">·</span>
+          <span>Données publiques de la Banque d'Algérie</span><span class="sep">·</span>
+          <span>Réponses rédigées par une IA, à vérifier dans le texte officiel</span><span class="sep">·</span>
+          <span>Ne constitue pas un avis juridique</span>
+        </footer>
+      </div>
     </div>
 
-    <form id="form" class="composer" autocomplete="off">
-      <div class="example-chips" role="region" aria-label="Questions d'exemple">
-        <span class="example-chips-title">Questions d'exemple :</span>
-        <div class="chips-list">
-          <button type="button" class="chip" data-question="Quel est le plafond d'indemnisation par déposant ?">Quel est le plafond d'indemnisation par déposant ?</button>
-          <button type="button" class="chip" data-question="Une banque peut-elle appliquer des conditions moins favorables que celles qu'elle a affichées ?">Une banque peut-elle appliquer des conditions moins favorables que celles qu'elle a affichées ?</button>
-          <button type="button" class="chip" data-question="Que dit l'article 3 ?">Que dit l'article 3 ?</button>
+    <div class="composer-dock">
+      <form id="form" class="composer" autocomplete="off">
+        <label for="question" class="sr-only">Votre question</label>
+        <textarea id="question" rows="1" placeholder="Posez votre question…" spellcheck="true" enterkeyhint="send"></textarea>
+        <div class="composer-row">
+          <span id="composer-msg" class="composer-msg" aria-live="polite"></span>
+          <span id="counter" class="counter">0 / 500</span>
+          <button type="submit" id="btn-send" class="btn btn-primary"><span class="btn-label">Envoyer</span></button>
         </div>
-      </div>
-      <label for="question" class="sr-only">Votre question</label>
-      <textarea id="question" rows="2" placeholder="Posez une question sur un texte réglementaire de la Banque d'Algérie…" spellcheck="true"></textarea>
-      <div class="composer-row">
-        <span id="composer-msg" class="composer-msg" aria-live="polite"></span>
-        <span id="counter" class="counter">0 / 500</span>
-        <button type="submit" id="btn-send" class="btn btn-primary">Envoyer</button>
-      </div>
+      </form>
       <p id="persist-note" class="persist-note" hidden></p>
-    </form>
+    </div>
   </main>
 </div>
 
-<footer class="footer">
-  <span>Projet éducatif non officiel</span><span class="sep">·</span>
-  <span>Données publiques de la Banque d'Algérie</span><span class="sep">·</span>
-  <span>Réponses rédigées par une IA, à vérifier dans le texte officiel</span><span class="sep">·</span>
-  <span>Ne constitue pas un avis juridique</span>
-</footer>
+<div id="toast" class="toast" role="status" hidden>
+  <span class="toast-text">Votre réponse est prête.</span>
+  <button type="button" id="toast-go" class="btn btn-primary">Lire la réponse</button>
+  <button type="button" id="toast-close" class="icon-btn" aria-label="Fermer ce message">
+    <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><line x1="6" y1="6" x2="18" y2="18"/><line x1="18" y1="6" x2="6" y2="18"/></svg>
+  </button>
+</div>
 
 <aside id="about-panel" class="drawer" hidden aria-labelledby="about-title">
   <div class="drawer-head">

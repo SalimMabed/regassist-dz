@@ -98,6 +98,7 @@
     if (state.busy) return;                                  // une question est en cours : ne pas écraser l'affichage du traitement
     const c = state.convs.find((x) => x.id === convId); const en = c && c.entries.find((x) => x.id === entryId);
     if (!en) return;
+    toggleHistory(false);
     state.conv = c; state.entry = en.id;
     showQuestion(en.q, 'Réponse enregistrée le ' + fmtWhen(en.at) + ' (historique de ce navigateur) : elle n\'est pas recalculée. Reposez la question pour obtenir une réponse à jour.');
     renderResponse(en.r);
@@ -107,13 +108,62 @@
 
   function newConversation() {
     if (state.busy) return;
+    toggleHistory(false);
     state.conv = null; state.entry = null;
     resetWorkspace(); renderHistory(); $('question').focus();
+  }
+
+  /* ---------- gabarit : état vide, défilement, tiroir de l'historique, signal « réponse prête » ---------- */
+  const reduceMotion = () => !!(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches);
+  const setEmpty = (on) => $('workspace').classList.toggle('is-empty', on);
+  const scrollToTop = () => { const s = $('scroll'); if (s) s.scrollTo({ top: 0, behavior: reduceMotion() ? 'auto' : 'smooth' }); };
+
+  function skeleton(cards) {                         // lignes d'attente décoratives (masquées aux lecteurs d'écran)
+    const d = el('div', 'skeleton' + (cards ? ' skeleton-cards' : '')); d.setAttribute('aria-hidden', 'true');
+    for (let i = 0; i < (cards ? 2 : 4); i++) d.append(document.createElement('i'));
+    return d;
+  }
+
+  function toggleHistory(open) {                     // tiroir de l'historique (écrans étroits ; sans effet visible sur grand écran)
+    if (document.body.classList.contains('history-open') === open) return;
+    document.body.classList.toggle('history-open', open);
+    $('scrim').hidden = !open; $('btn-menu').setAttribute('aria-expanded', String(open));
+    if (open) $('btn-new').focus(); else if (document.activeElement && $('history').contains(document.activeElement)) $('btn-menu').focus();
+  }
+
+  let toastTimer = null;
+  function hideToast() { clearTimeout(toastTimer); $('toast').hidden = true; }
+  function showToast() { $('toast').hidden = false; clearTimeout(toastTimer); toastTimer = setTimeout(hideToast, 15000); }
+  function readAnswer() {                            // « Lire la réponse » : referme les panneaux ouverts et amène la réponse à l'écran
+    hideToast(); toggleHistory(false); if (!$('about-panel').hidden) toggleAbout(false);
+    const a = $('answer'); a.tabIndex = -1;
+    a.closest('.pane').scrollIntoView({ block: 'start', behavior: reduceMotion() ? 'auto' : 'smooth' }); a.focus({ preventScroll: true });
+  }
+  // La réponse vient d'arriver : légère mise en valeur de la carte, et un message si elle n'est pas visible (panneau ouvert, zone défilée).
+  function markReady() {
+    const pane = $('answer').closest('.pane');
+    pane.classList.remove('is-new'); void pane.offsetWidth; pane.classList.add('is-new');
+    setTimeout(() => pane.classList.remove('is-new'), 2600);
+    const r = pane.getBoundingClientRect();
+    const covered = !$('about-panel').hidden || document.body.classList.contains('history-open');
+    if (covered || r.bottom < 80 || r.top > window.innerHeight * 0.85) showToast();
+  }
+
+  function autosize() {                              // le champ de saisie grandit avec le texte (plafonné)
+    const t = $('question'); t.style.height = 'auto'; t.style.height = Math.min(t.scrollHeight, 168) + 'px';
+  }
+
+  function trackViewport() {                         // hauteur réellement visible : le clavier tactile ne masque plus la saisie
+    const vv = window.visualViewport; if (!vv) return;
+    const root = document.documentElement.style;
+    const apply = () => { if (vv.scale <= 1.02) root.setProperty('--app-h', Math.round(vv.height) + 'px'); };
+    vv.addEventListener('resize', apply); apply();
   }
 
   /* ---------- rendu ---------- */
   function resetWorkspace() {
     if (state.timer) { clearInterval(state.timer); state.timer = null; }
+    hideToast(); setEmpty(true);
     $('question-echo').hidden = true; $('answer').removeAttribute('aria-busy');
     $('sources').replaceChildren(el('p', 'placeholder', 'Les textes officiels retrouvés apparaîtront ici, avec leurs extraits.'));
     $('answer').replaceChildren(el('p', 'placeholder', 'Posez une question en bas de page. La réponse n\'est affichée qu\'accompagnée de ses sources.'));
@@ -122,7 +172,7 @@
   function showQuestion(q, savedNote) {
     const box = $('question-echo'); box.replaceChildren(el('div', 'q-label', 'Question'), el('div', 'q-text', q));
     if (savedNote) box.append(el('div', 'q-saved', savedNote));
-    box.hidden = false;
+    box.hidden = false; hideToast(); setEmpty(false); scrollToTop();
   }
 
   function tag(text, kind) { return el('span', 'tag' + (kind ? ' tag-' + kind : ''), text); }
@@ -263,13 +313,16 @@
     const notes = r.notes || [];
     const hasTexts = Array.isArray(r.texts) && r.texts.length > 0 && !!r.texts_intro;      // absent des anciennes réponses de l'historique : ancien affichage
     if (r.status === 'answered') {
-      box.append(el('p', 'ans-label', 'Réponse rédigée par une intelligence artificielle uniquement à partir des sources ci-contre. Elle peut contenir des erreurs : vérifiez chaque citation dans le texte officiel (PDF).'));
-      if (notes.length) { const tg = el('div', 'tags'); tg.append(tag(notes.length + ' avertissement(s) à lire sous la réponse', 'warn')); box.append(tg); }
+      // La réponse d'abord : une pastille rappelle d'emblée qu'elle est rédigée par une IA ; la mention complète suit la réponse, dans la même carte.
+      const tg = el('div', 'tags'); tg.append(tag('Rédigée par une IA : à vérifier', 'neutral'));
+      if (notes.length) tg.append(tag(notes.length + ' avertissement(s) à lire sous la réponse', 'warn'));
+      box.append(tg);
       const ids = new Set((r.sources || []).map((s) => s.id));
       const t = el('div', 'ans-text'); withCitations(t, humanize(r.answer), ids); box.append(t);
       const cites = (r.citations || []).map((c) => c.id);
       if (cites.length) { const l = el('div', 'cited-list', 'Sources citées : '); cites.forEach((id, i) => { if (i) l.append(document.createTextNode(' ')); withCitations(l, '[' + id + ']', ids); }); box.append(l); }
       if (notes.length) { const w = callout('warn', 'À vérifier avant tout usage', null, notes.map(plain)); w.classList.add('callout-after'); box.append(w); }
+      box.append(el('p', 'ans-label', 'Réponse rédigée par une intelligence artificielle uniquement à partir des sources listées avec elle. Elle peut contenir des erreurs : vérifiez chaque citation dans le texte officiel (PDF).'));
     } else if (r.status === 'refused') {
       const extra = r.reason === 'refus_modele' ? ' Des passages ont été examinés, mais aucune réponse sourcée n\'a pu en être tirée.' : '';
       if (hasTexts) {
@@ -292,7 +345,7 @@
         box.append(callout('warn', 'Pourquoi pas de réponse directe', why));
       } else {
         box.append(callout('warn', 'Réponse indisponible', why));
-        box.append(el('p', 'ans-label', 'Les passages retrouvés sont affichés ci-contre. Ils ne constituent pas une réponse.'));
+        box.append(el('p', 'ans-label', 'Les passages retrouvés sont affichés dans la section Sources. Ils ne constituent pas une réponse.'));
       }
       const rest = notes.filter((n) => n !== why);
       if (rest.length) box.append(callout('warn', 'Précisions', null, rest.map(plain)));
@@ -316,8 +369,8 @@
     const p = el('p', 'loading'); const t0 = Date.now();
     const msg = el('span', null, 'Recherche dans les textes puis rédaction de la réponse. Cela peut prendre jusqu\'à deux minutes… ');
     const sec = el('span', 'elapsed', '0 s'); sec.setAttribute('aria-live', 'off');
-    p.append(msg, sec); box.append(p);
-    $('sources').replaceChildren(el('p', 'placeholder', 'Recherche des sources en cours…'));
+    p.append(msg, sec); box.append(p, skeleton(false));
+    $('sources').replaceChildren(el('p', 'placeholder', 'Recherche des sources en cours…'), skeleton(true));
     if (state.timer) clearInterval(state.timer);
     state.timer = setInterval(() => { sec.textContent = Math.round((Date.now() - t0) / 1000) + ' s'; }, 1000);
   }
@@ -341,6 +394,7 @@
     const disabled = state.busy || !state.reachable || starting();
     $('btn-send').disabled = disabled || n < 3 || q.length > state.maxQ;
     document.querySelectorAll('.chip').forEach((b) => { b.disabled = disabled; });
+    autosize();
   }
 
   function commitAnswer(q, data, meta) {
@@ -352,6 +406,7 @@
     if (meta && meta.viaLink) $('answer').prepend(el('p', 'ans-label', 'Réponse retrouvée avec votre lien personnel.'));
     const note = serverNote(entry); if (note) $('answer').append(note);
     $('question').value = '';
+    markReady();
   }
 
   async function sendQuestion() {
@@ -696,7 +751,18 @@
     });
     $('btn-about').addEventListener('click', () => toggleAbout($('about-panel').hidden));
     $('btn-about-close').addEventListener('click', () => toggleAbout(false));
-    document.addEventListener('keydown', (ev) => { if (ev.key === 'Escape' && !$('about-panel').hidden) toggleAbout(false); });
+    $('btn-menu').addEventListener('click', () => toggleHistory(!document.body.classList.contains('history-open')));
+    $('scrim').addEventListener('click', () => toggleHistory(false));
+    $('toast-go').addEventListener('click', readAnswer);
+    $('notice-more').addEventListener('click', () => toggleAbout(true));            // bandeau compact : « Texte complet » ouvre le panneau « À propos »
+    $('toast-close').addEventListener('click', hideToast);
+    document.addEventListener('keydown', (ev) => {
+      if (ev.key !== 'Escape') return;
+      if (!$('about-panel').hidden) toggleAbout(false);
+      else if (document.body.classList.contains('history-open')) toggleHistory(false);
+      else if (!$('toast').hidden) hideToast();
+    });
+    trackViewport();
     refreshStatus().then(() => { const t = hashTicket() || (loadActive() || {}).ticket; if (t) resumeTracking(t); });            // lien personnel ou question encore en cours : le suivi reprend
     setInterval(() => { if (!document.hidden && !state.busy) refreshStatus(); }, POLL_MS);
     window.addEventListener('online', () => { if (state.wake) state.wake(); });
@@ -709,7 +775,7 @@
     window.addEventListener('pagehide', () => {          // file en mémoire seulement : page fermée = place libérée (la file persistante conserve la demande)
       if (state.ticket && !persistent()) fetch('/api/queue/' + encodeURIComponent(state.ticket) + '/cancel', { method: 'POST', keepalive: true }).catch(() => {});
     });
-    $('question').focus();
+    if (window.matchMedia && window.matchMedia('(pointer: fine)').matches) $('question').focus();          // sur téléphone, le clavier ne s'ouvre pas tout seul au chargement
   }
   init();
 })();
