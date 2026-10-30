@@ -156,8 +156,13 @@
   function trackViewport() {                         // hauteur réellement visible : le clavier tactile ne masque plus la saisie
     const vv = window.visualViewport; if (!vv) return;
     const root = document.documentElement.style;
-    const apply = () => { if (vv.scale <= 1.02) root.setProperty('--app-h', Math.round(vv.height) + 'px'); };
-    vv.addEventListener('resize', apply); apply();
+    // La hauteur du « viewport visuel » ne sert que si elle est vraiment plus petite que la fenêtre (clavier tactile sur iOS, qui ne réduit pas la fenêtre) ;
+    // sinon on laisse le CSS (100dvh), qui est juste partout ailleurs et ne dépend pas d'une valeur lue au mauvais moment.
+    const apply = () => {
+      if (vv.scale > 1.02) return;                    // zoom par pincement : la hauteur visible n'est pas celle de la mise en page
+      if (window.innerHeight - vv.height > 1) root.setProperty('--app-h', Math.round(vv.height) + 'px'); else root.removeProperty('--app-h');
+    };
+    vv.addEventListener('resize', apply); window.addEventListener('resize', apply); apply();
   }
 
   /* ---------- rendu ---------- */
