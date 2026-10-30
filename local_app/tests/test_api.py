@@ -407,7 +407,9 @@ def test_static_files_load_nothing_from_outside_the_application():
     assert "XMLHttpRequest" not in js and "WebSocket" not in js and "sendBeacon" not in js and "import(" not in js
     everything = html + css + js + (C.STATIC_DIR / "favicon.svg").read_text(encoding="utf-8")
     assert not re.search(r"sk-[A-Za-z0-9_-]{8,}|ANTHROPIC|api[_-]?key|secret|token", everything, re.I), "clé, jeton ou secret dans l'interface"
-    assert not re.search("[\U0001F000-\U0001FAFF☀-➿️]", everything), "emoji dans l'interface"
+    EMOJI = "[\U0001F000-\U0001FAFF☀-➿️]"
+    assert not re.search(EMOJI, css + js + (C.STATIC_DIR / "favicon.svg").read_text(encoding="utf-8")), "emoji dans le CSS, le JavaScript ou l'icône"
+    assert set(re.findall(EMOJI, html)) == {"🧠", "🎮"}, "seuls emoji voulus, dans la fenêtre proposée après l'envoi : le cerveau (quiz) et la manette (jeu)"
     literals = re.findall(r"'(?:[^'\\\n]|\\.)*'|\"(?:[^\"\\\n]|\\.)*\"", js)                      # chaînes du JavaScript (pas ses identifiants : r.llm, ocr_uncertain…)
     visible = html + " ".join(literals)
     assert not re.search(r"llama|qwen|rerank|hybrid|PHASE_4|NO-GO|127\.0\.0\.1|OCR_UNCERTAIN|chunk|Traçabilité|\bLLM\b|\bport\b|\bms\b", visible, re.I), \

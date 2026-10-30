@@ -131,6 +131,27 @@
     if (open) $('btn-new').focus(); else if (document.activeElement && $('history').contains(document.activeElement)) $('btn-menu').focus();
   }
 
+  /* ---------- choix proposé dès l'envoi d'une question : quiz, jeu, ou simplement attendre ---------- */
+  function offerClose(restoreFocus) {
+    const box = $('offer'); if (box.hidden) return;
+    box.hidden = true; state.offerTr = null;
+    if (restoreFocus) { const a = $('answer'); a.tabIndex = -1; a.focus({ preventScroll: true }); }
+  }
+  function offerOpen(tr) {                           // seulement quand la fiche de suivi propose bien le quiz et/ou le jeu
+    if (!tr || !(tr.acts.quiz || tr.acts.game)) return;
+    state.offerTr = tr;
+    $('offer-quiz').hidden = !tr.acts.quiz; $('offer-game').hidden = !tr.acts.game;
+    $('offer').hidden = false; $('offer').querySelector('.offer-panel').focus();
+  }
+  function offerChoose(kind) { const tr = state.offerTr; offerClose(false); if (tr && tr.acts[kind]) toggleActivity(tr, kind, true); }
+  function offerKeys(ev) {                           // le focus reste dans la fenêtre tant qu'elle est ouverte
+    if (ev.key !== 'Tab') return;
+    const items = [...$('offer').querySelectorAll('button')].filter((b) => !b.hidden); if (!items.length) return;
+    const first = items[0], last = items[items.length - 1], on = document.activeElement;
+    if (ev.shiftKey && (on === first || on === $('offer').querySelector('.offer-panel'))) { ev.preventDefault(); last.focus(); }
+    else if (!ev.shiftKey && on === last) { ev.preventDefault(); first.focus(); }
+  }
+
   let toastTimer = null;
   function hideToast() { clearTimeout(toastTimer); $('toast').hidden = true; }
   function showToast() { $('toast').hidden = false; clearTimeout(toastTimer); toastTimer = setTimeout(hideToast, 15000); }
@@ -531,7 +552,7 @@
     const steps = el('ol', 'track-steps'); const items = STEPS.map((t) => { const li = el('li', 'track-step'); li.append(el('span', 'track-dot'), el('span', 'track-label', t)); steps.append(li); return li; });
     const detail = el('p', 'track-detail'); const net = el('p', 'track-net', 'Connexion interrompue : nouvelle tentative en cours. Votre question n\'est pas perdue.'); net.hidden = true;
     card.append(live, steps, detail, net);
-    const tr = { card, live, items, detail, net, q, since: null, game: null, gameOpen: false, last: '' };
+    const tr = { card, live, items, detail, net, q, since: null, acts: {}, activity: null, gameOpen: false, last: '' };
     if (persistent()) {
       card.append(el('p', 'track-note', 'Vous pouvez fermer cette page : votre question est conservée sur le serveur ' + days() + '. Gardez ce lien personnel pour la retrouver, sans le partager : il donne accès à votre question et à sa réponse.'));
       const row = el('div', 'track-link'); const input = el('input'); input.type = 'text'; input.readOnly = true; input.value = trackUrl(v.ticket); input.setAttribute('aria-label', 'Lien personnel de suivi');
@@ -546,21 +567,39 @@
     const actions = el('div', 'track-actions');
     const play = el('button', 'btn btn-ghost', 'Patienter en jouant (facultatif)'); play.type = 'button'; play.setAttribute('aria-expanded', 'false');
     const gameBox = el('div', 'track-game'); gameBox.hidden = true;
-    play.addEventListener('click', () => toggleGame(tr, play, gameBox, true));
+    tr.acts.game = { btn: play, box: gameBox, lib: 'RegAssistGame', mod: null };
+    play.addEventListener('click', () => toggleActivity(tr, 'game', true));
+    const quizBox = el('div', 'track-quiz'); quizBox.hidden = true;
+    let quizBtn = null;
+    if (window.RegAssistQuiz && window.RegAssistQuizData) {                 // le quiz est facultatif : sans ses données, seul le jeu est proposé
+      quizBtn = el('button', 'btn btn-ghost', 'Quiz sur les textes (facultatif)'); quizBtn.type = 'button'; quizBtn.setAttribute('aria-expanded', 'false');
+      tr.acts.quiz = { btn: quizBtn, box: quizBox, lib: 'RegAssistQuiz', mod: null };
+      quizBtn.addEventListener('click', () => toggleActivity(tr, 'quiz', true));
+    }
     const del = el('button', 'btn btn-link', persistent() ? 'Supprimer ma question' : 'Quitter la file d\'attente'); del.type = 'button';
     let armed = null;
     del.addEventListener('click', () => {
       if (persistent() && !armed) { del.textContent = 'Confirmer la suppression'; armed = setTimeout(() => { del.textContent = 'Supprimer ma question'; armed = null; }, 4000); return; }
       clearTimeout(armed); armed = null; leaveTrack(tr);
     });
-    actions.append(play, del); card.append(actions, gameBox); box.append(card);
+    actions.append(play); if (quizBtn) actions.append(quizBtn); actions.append(del); card.append(actions, gameBox, quizBox); box.append(card);
     $('sources').replaceChildren(el('p', 'placeholder', 'Les sources s\'afficheront avec la réponse.'));
     state.tr = tr;
   }
 
-  function toggleGame(tr, play, gameBox, open) {
-    tr.gameOpen = open; gameBox.hidden = !open; play.setAttribute('aria-expanded', String(open));
-    if (open && !tr.game && window.RegAssistGame) tr.game = window.RegAssistGame.mount(gameBox, { onBack: () => { toggleGame(tr, play, gameBox, false); play.focus(); } });
+  function toggleActivity(tr, kind, open) {           // une seule activité facultative visible à la fois (jeu ou quiz) ; chacune garde son état quand on passe de l'une à l'autre
+    if (open) offerClose(false);                      // choisir une activité (depuis la fenêtre de choix ou la fiche de suivi) referme la fenêtre de choix
+    for (const k of Object.keys(tr.acts)) { const on = open && k === kind; tr.acts[k].box.hidden = !on; tr.acts[k].btn.setAttribute('aria-expanded', String(on)); }
+    tr.gameOpen = open; tr.activity = open ? kind : null;
+    const a = tr.acts[kind];
+    if (open && !a.mod && window[a.lib]) {
+      const back = () => { toggleActivity(tr, kind, false); a.btn.focus(); };
+      const other = kind === 'quiz' ? tr.acts.game : tr.acts.quiz;
+      const opts = { onBack: back };
+      if (other) opts.onSwitch = () => { toggleActivity(tr, kind === 'quiz' ? 'game' : 'quiz', true); const f = other.box.querySelector('.game-card, .quiz-title'); if (f) f.focus(); };
+      a.mod = window[a.lib].mount(a.box, opts);
+    }
+    if (open && kind === 'quiz') { const h = a.box.querySelector('.quiz-title'); if (h) h.focus(); }
     if (!open && tr.onGameClose) { const f = tr.onGameClose; tr.onGameClose = null; f(); }
   }
 
@@ -612,15 +651,16 @@
     if (persistent()) $('answer').replaceChildren(callout('info', 'Question supprimée', 'Votre question a été supprimée du serveur. Vous pouvez en poser une autre.'));
   }
 
-  async function followTicket(v, q) {
+  async function followTicket(v, q, offer) {          // offer : nouvelle question (et non reprise par lien) → la fenêtre « quiz, jeu ou attendre » est proposée une fois
     state.ticket = v.ticket; state.cancelled = false; state.tr = null;
-    let fails = 0;
+    let fails = 0; let offered = false;
     try {
       while (true) {
-        if (v.state === 'done') { flagTitle(); await waitForReader(); return v; }
+        if (v.state === 'done') { offerClose(false); flagTitle(); await waitForReader(); return v; }
         if (v.state === 'error') { renderError((v.error && v.error.message) || 'La question n\'a pas pu être traitée.'); return null; }
         if (state.cancelled) { afterLeave(); return null; }
         updateTrack(v, q);
+        if (offer && !offered) { offered = true; offerOpen(state.tr); }
         await sleep(document.hidden ? QUEUE_POLL_HIDDEN_MS : QUEUE_POLL_MS);
         if (state.cancelled) { afterLeave(); return null; }
         let r;
@@ -637,7 +677,7 @@
         v = r.data;
       }
     } finally {
-      state.ticket = null; if (state.tr && state.tr.game) state.tr.game.destroy(); state.tr = null;
+      offerClose(false); state.ticket = null; if (state.tr) Object.values(state.tr.acts).forEach((a) => { if (a.mod) a.mod.destroy(); }); state.tr = null;
     }
   }
 
@@ -654,7 +694,7 @@
     let v = r.data;
     if (v.state === 'done' && !v.ticket) return { result: v.result };                   // salutation : réponse immédiate
     if (persistent()) { saveActive(v.ticket, q, false); setHash(v.ticket); }
-    v = await followTicket(v, q);
+    v = await followTicket(v, q, true);
     if (!v) return null;
     clearActive(); setHash(null);
     return { result: v.result, ticket: persistent() ? v.ticket : null, exp: Date.now() + (v.expires_in_s || 0) * 1000 };
@@ -761,9 +801,14 @@
     $('toast-go').addEventListener('click', readAnswer);
     $('notice-more').addEventListener('click', () => toggleAbout(true));            // bandeau compact : « Texte complet » ouvre le panneau « À propos »
     $('toast-close').addEventListener('click', hideToast);
+    $('offer-quiz').addEventListener('click', () => offerChoose('quiz'));
+    $('offer-game').addEventListener('click', () => offerChoose('game'));
+    $('offer-none').addEventListener('click', () => offerClose(true));
+    $('offer').addEventListener('keydown', offerKeys);
     document.addEventListener('keydown', (ev) => {
       if (ev.key !== 'Escape') return;
-      if (!$('about-panel').hidden) toggleAbout(false);
+      if (!$('offer').hidden) offerClose(true);
+      else if (!$('about-panel').hidden) toggleAbout(false);
       else if (document.body.classList.contains('history-open')) toggleHistory(false);
       else if (!$('toast').hidden) hideToast();
     });

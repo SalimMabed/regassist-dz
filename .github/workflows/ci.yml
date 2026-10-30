@@ -61,6 +61,14 @@ jobs:
         run: |
           python local_app/tests/test_webpush.py
 
+      - name: Run Quiz Question Bank Tests
+        run: |
+          python local_app/tests/test_quiz_data.py
+
+      - name: Run Quiz Logic Tests
+        run: |
+          node --test local_app/tests/test_quiz.mjs
+
       - name: Run Grounding Guard Tests
         run: |
           python local_app/tests/test_grounding.py

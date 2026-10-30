@@ -10,7 +10,7 @@
 | File existante | `local_app/waitqueue.py` : tickets, position, estimation ; **en mémoire** : un redémarrage ou une page fermée > 2 min perdait la question. |
 | Stockage | Aucun. Historique seulement dans `localStorage`. |
 | Notifications | Aucune. |
-| Contraintes | CSP stricte (`self`), tests de contrat sur l'interface (aucune ressource externe, `fetch` vers `/api/` seulement, pas d'emoji, aucun détail technique visible), moteur gelé, application Windows à ne pas changer. |
+| Contraintes | CSP stricte (`self`), tests de contrat sur l'interface (aucune ressource externe, `fetch` vers `/api/` seulement, aucun emoji hors 🧠 et 🎮 de la fenêtre de choix, aucun détail technique visible), moteur gelé, application Windows à ne pas changer. |
 | Dépendance Web Push | `cryptography` n'est présente qu'indirectement (pdfminer) : ajoutée **uniquement** à `deploy/requirements-deploy.txt` (la base gelée `requirements.txt` n'est pas touchée), et facultative à l'exécution. |
 
 Ce qui n'a pas été construit, et pourquoi : une interface de rédaction de réponses. Les réponses sont produites automatiquement par le moteur ; une rédaction manuelle contredirait le produit. Les compteurs de la file sont déjà publics dans `/api/status` (sans aucune question).
@@ -27,9 +27,10 @@ Ce qui n'a pas été construit, et pourquoi : une interface de rédaction de ré
 ## 3. Mini-jeu retenu : mémoire de paires (facultatif)
 
 Trois pistes étudiées : **mémoire de paires**, séquence à reproduire (type Simon), réflexes. Retenu : la mémoire, parce qu'elle se joue sans son ni couleur (formes + noms accessibles « carré, disque, triangle, losange, triangle inversé, cercle »), au clavier (flèches, Début/Fin, Entrée) comme au toucher, **sans aucune pression de temps** (convient à un outil juridique sérieux), et dure environ une minute.
-* Proposé par un bouton discret « Patienter en jouant (facultatif) » ; jamais lancé seul.
+* Proposé par un bouton discret « Patienter en jouant (facultatif) » **et** par la fenêtre de choix qui s'ouvre à l'envoi (« 🎮 Jouer à un jeu », à côté de « 🧠 Répondre à un quiz » et de « Aucun des deux, juste attendre » : voir `docs/LOCAL_UI.md` §4) ; jamais lancé seul.
 * Coups, temps, meilleur résultat (gardé dans ce navigateur), rejouer, « Retour au suivi » (le focus revient au bouton).
 * Aucune requête réseau ; il vit dans son cadre et n'agit ni sur la question ni sur sa réponse.
+* Un **quiz facultatif** sur les textes de la Banque d'Algérie complète le jeu dans le même espace (questions vérifiées dans le corpus, chacune avec sa source et le lien vers le PDF officiel) : voir `docs/QUIZ_ATTENTE.md`.
 * Si la réponse arrive pendant une partie, **la partie n'est pas interrompue** : un bandeau « Votre réponse est prête » invite à la lire.
 * `prefers-reduced-motion` respecté (aucune animation), cibles ≥ 44 px sur téléphone.
 
