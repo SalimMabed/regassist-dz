@@ -25,9 +25,10 @@ from .service import Service, ServiceError, check_environment, setup_logging, va
 CSP = ("default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src 'self'; font-src 'self'; "
        "base-uri 'none'; form-action 'none'; frame-ancestors 'none'; worker-src 'self'")
 _PAGES = {"": "index.html", "index.html": "index.html", "app.css": "app.css", "app.js": "app.js", "favicon.svg": "favicon.svg", "login.css": "login.css",
+          "favicon.ico": "favicon.ico", "apple-touch-icon.png": "apple-touch-icon.png",
           "game.js": "game.js", "sw.js": "sw.js"}
 # Mode réseau seulement : ce qui reste accessible sans code d'accès (la page d'accès et ses ressources, la sonde de vie qui ne renvoie que « ok »).
-_PUBLIC_IN_LAN = {"/login", "/login.css", "/favicon.svg", "/favicon.ico", "/api/health"}
+_PUBLIC_IN_LAN = {"/login", "/login.css", "/favicon.svg", "/favicon.ico", "/apple-touch-icon.png", "/api/health"}
 _TICKET = re.compile(r"[A-Za-z0-9_-]{16,64}")
 
 
@@ -328,10 +329,6 @@ def create_app(service: Service, port: int | None = None, lan: "L.LanAccess | No
     def queue_cancel(ticket):
         ok = app.wait_queue is not None and bool(_TICKET.fullmatch(ticket)) and app.wait_queue.cancel(ticket)
         return jsonify({"cancelled": ok})
-
-    @app.get("/favicon.ico")
-    def favicon_ico():
-        return "", 204
 
     @app.get("/", defaults={"name": ""})
     @app.get("/<path:name>")

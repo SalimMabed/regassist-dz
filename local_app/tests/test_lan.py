@@ -66,8 +66,12 @@ def test_everything_but_the_login_page_requires_a_session():
     assert r.status_code == 401
     assert c.get("/api/health", base_url=BASE).status_code == 200
     assert c.get("/login.css", base_url=BASE).status_code == 200
+    for icon, magic in (("/favicon.ico", b"\x00\x00\x01\x00"), ("/favicon.svg", b"<svg"), ("/apple-touch-icon.png", b"\x89PNG")):      # icônes publiques (la page d'accès les affiche) : de vraies images, rien d'autre
+        r = c.get(icon, base_url=BASE)
+        assert r.status_code == 200 and r.get_data().startswith(magic), icon
     r = c.get("/login", base_url=BASE)
     assert r.status_code == 200 and "Code d'accès" in r.get_data(as_text=True)
+    assert 'rel="icon" href="favicon.ico"' in r.get_data(as_text=True) and 'rel="apple-touch-icon"' in r.get_data(as_text=True)
     assert "form-action 'self'" in r.headers["Content-Security-Policy"] and "script-src" not in r.headers["Content-Security-Policy"]
 
 

@@ -358,11 +358,36 @@ def test_no_cors_headers_are_ever_emitted_and_security_headers_are_present():
     assert c.options("/api/chat", base_url=BASE, headers={"Origin": "https://evil.example", "Access-Control-Request-Method": "POST"}).status_code in (403, 405)
 
 
+def test_site_icons_are_declared_served_and_really_images():
+    """Onglet, favoris et écran d'accueil iOS : le HTML déclare les icônes et chacune est servie avec un vrai contenu d'image (plus de réponse vide)."""
+    import struct
+    _, c, _, _ = build()
+    html = get(c, "/").get_data(as_text=True)
+    for tag in ('rel="icon" href="favicon.ico"', 'rel="icon" href="favicon.svg" type="image/svg+xml"', 'rel="apple-touch-icon" href="apple-touch-icon.png"'):
+        assert tag in html, tag
+    ico = get(c, "/favicon.ico")
+    data = ico.get_data()
+    assert ico.status_code == 200 and "icon" in ico.headers["Content-Type"] and data[:4] == b"\x00\x00\x01\x00", "favicon.ico doit être un vrai fichier ICO"
+    count = struct.unpack("<H", data[4:6])[0]
+    sizes = {(data[6 + 16 * i] or 256, data[7 + 16 * i] or 256) for i in range(count)}
+    assert {(16, 16), (32, 32), (48, 48)} <= sizes, sizes
+    svg = get(c, "/favicon.svg")
+    assert svg.status_code == 200 and "svg" in svg.headers["Content-Type"] and b"<svg" in svg.get_data()
+    touch = get(c, "/apple-touch-icon.png")
+    png = touch.get_data()
+    assert touch.status_code == 200 and touch.headers["Content-Type"] == "image/png" and png[:8] == b"\x89PNG\r\n\x1a\n"
+    assert struct.unpack(">II", png[16:24]) == (180, 180), "icône iOS : 180 x 180"
+    assert "default-src 'none'" in ico.headers["Content-Security-Policy"] and "img-src 'self'" in ico.headers["Content-Security-Policy"]
+    for p in ("/favicon.png", "/icon.ico", "/apple-touch-icon-precomposed.png", "/make_icons.py", "/../make_icons.py"):
+        r = get(c, p)
+        assert r.status_code in (404, 403), (p, r.status_code)                               # seules les icônes listées sont servies, pas le script qui les génère
+
+
 def test_static_interface_is_served_and_unknown_paths_do_not_leak_files():
     _, c, _, _ = build()
     html = get(c, "/").get_data(as_text=True)
     assert "ASSISTANT JURIDIQUE" in html and 'src="app.js"' in html
-    assert get(c, "/app.js").status_code == 200 and get(c, "/app.css").status_code == 200 and get(c, "/favicon.ico").status_code == 204
+    assert get(c, "/app.js").status_code == 200 and get(c, "/app.css").status_code == 200
     for p in ("/service.py", "/../config.py", "/..%2fconfig.py", "/runtime/api.log", "/tests/fakes.py", "/api/inconnu", "/static/app.js"):
         r = get(c, p)
         assert r.status_code in (404, 403) and r.is_json, (p, r.status_code)
