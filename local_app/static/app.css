@@ -1108,6 +1108,7 @@ h1, h2, h3, h4, p { margin: 0; }
 .offer {
   position: fixed;
   inset: 0;
+  height: var(--app-h);                  /* la zone réellement visible, comme le reste de l'application (clavier tactile compris) */
   z-index: 90;
   display: flex;
   align-items: center;

@@ -1020,6 +1020,11 @@ test('fenêtre de choix, téléphone : feuille en bas, cartes empilées et facil
       assert.ok(m.q.h >= 44 && m.g.h >= 44 && m.none.h >= 44 && m.q.w >= 44, `${w} px : zones tactiles : ${m.q.h} / ${m.g.h} / ${m.none.h}`);
       assert.ok(m.panel.t >= 0 && m.panel.b <= m.vh + 1, `${w} px : fenêtre entièrement visible : ${m.panel.t} → ${m.panel.b} sur ${m.vh}`);
       assert.ok(m.none.b <= m.vh + 1 && m.none.t >= m.g.b, `${w} px : « Aucun des deux » visible en bas`);
+      const reduced = h - 120;                                                       // clavier tactile ou barre du navigateur : le script réduit --app-h, la fenêtre doit suivre la zone visible
+      await ev(`document.documentElement.style.setProperty('--app-h', '${reduced}px')`);
+      const k = await offerGeometry();
+      await ev(`document.documentElement.style.removeProperty('--app-h')`);
+      assert.ok(k.panel.b <= reduced + 1 && k.panel.t >= 0, `${w} px : la fenêtre reste dans la zone visible réduite à ${reduced} px : ${k.panel.t} → ${k.panel.b}`);
       await ev(`document.getElementById('offer-quiz').click()`);
       await waitFor(`!!document.querySelector('.quiz .quiz-title')`, 'quiz ouvert');
       assert.equal(await offerHidden(), true);
