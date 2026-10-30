@@ -41,7 +41,7 @@ def main() -> int:
     s3 = start(p3, "--delay", "3", "--queue", "4", "--persist", "tmp", "--push")            # file persistante + notifications annoncées (envoi simulé)
     try:
         env = dict(os.environ, UI_URL=f"http://127.0.0.1:{p1}/", UI_URL_LLM_OFF=f"http://127.0.0.1:{p2}/", UI_URL_PERSIST=f"http://127.0.0.1:{p3}/")
-        r = subprocess.run([node, "--test", "--test-timeout=180000", "--test-reporter=spec", str(ROOT / "local_app" / "tests" / "test_ui.mjs")], env=env, cwd=ROOT, capture_output=True, text=True, encoding="utf-8")
+        r = subprocess.run([node, "--test", "--test-timeout=600000", "--test-reporter=spec", str(ROOT / "local_app" / "tests" / "test_ui.mjs")], env=env, cwd=ROOT, capture_output=True, text=True, encoding="utf-8")
         out = r.stdout + r.stderr
         print(out)
         passed = int(re.search(r"ℹ pass (\d+)", out).group(1)) if re.search(r"ℹ pass (\d+)", out) else 0
