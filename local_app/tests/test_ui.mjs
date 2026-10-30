@@ -610,12 +610,13 @@ test('téléphone : la réponse est visible dès le premier écran et au-dessus 
     await fresh();
     assert.equal(await ev(`!!document.querySelector('.notice-full').offsetParent`), true, 'à l\'accueil, texte complet de la mise en garde');
     await ask('plafond'); await waitFor(`document.querySelector('#answer .ans-text')`, 'réponse');
-    const m = await ev(`({ sw: document.documentElement.scrollWidth, iw: innerWidth, vh: innerHeight, ansTop: document.querySelector('#answer .ans-text').getBoundingClientRect().top, srcTop: document.querySelector('.pane-sources').getBoundingClientRect().top,
+    const m = await ev(`({ sw: document.documentElement.scrollWidth, iw: innerWidth, vh: window.visualViewport.height, ih: innerHeight, ansTop: document.querySelector('#answer .ans-text').getBoundingClientRect().top, srcTop: document.querySelector('.pane-sources').getBoundingClientRect().top,
       dockBottom: document.querySelector('.composer-dock').getBoundingClientRect().bottom, appH: getComputedStyle(document.documentElement).getPropertyValue('--app-h'), vvH: window.visualViewport.height, bodyH: document.body.getBoundingClientRect().height, short: !!document.querySelector('.notice-short').offsetParent, full: !!document.querySelector('.notice-full').offsetParent })`);
     assert.ok(m.sw <= m.iw + 1, `défilement horizontal : ${m.sw} > ${m.iw}`);
     assert.ok(m.ansTop < m.vh * 0.6, 'le texte de la réponse est dans la moitié haute du premier écran : ' + m.ansTop + ' / ' + m.vh);
     assert.ok(m.ansTop < m.srcTop, 'réponse au-dessus des sources');
-    assert.ok(Math.abs(m.dockBottom - m.vh) <= 2, 'la saisie est collée au bas de l\'écran : ' + JSON.stringify({ dockBottom: m.dockBottom, innerHeight: m.vh, appH: m.appH, visualViewportH: m.vvH, bodyH: m.bodyH }));
+    // Référence : la zone réellement visible (visualViewport). Dans un navigateur sans interface, window.innerHeight peut être plus grand que l'écran émulé (894 contre 844 en CI).
+    assert.ok(Math.abs(m.dockBottom - m.vh) <= 2, 'la saisie est collée au bas de la zone visible : ' + JSON.stringify({ dockBottom: m.dockBottom, visibleHeight: m.vh, innerHeight: m.ih, appH: m.appH, visualViewportH: m.vvH, bodyH: m.bodyH }));
     assert.equal(m.short, true); assert.equal(m.full, false);
     assert.match(await ev(`document.querySelector('.notice-short').innerText`), /non officiel.*non validées par un juriste.*seul le texte officiel \(PDF\) fait foi/s, 'la version courte garde l\'essentiel de la mise en garde');
     await ev(`document.getElementById('notice-more').click()`);
