@@ -1,0 +1,39 @@
+RegAssist DZ
+Copyright 2026 Salim Mabed and the RegAssist DZ contributors
+
+This is an unofficial educational project built for the Thirduni competition
+(cohort 1). It is not affiliated with the Bank of Algeria, it has not been
+validated by a lawyer, and nothing in it is legal advice: only the official
+text (PDF) is authoritative.
+
+WHAT THE APACHE LICENSE 2.0 (file LICENSE) COVERS
+
+  The source code (Python, JavaScript, HTML, CSS, PowerShell and shell
+  scripts) and the documentation written for this project.
+
+WHAT IT DOES NOT COVER
+
+  * corpus/, state/ and replication/: copies of texts published by the Bank of
+    Algeria (https://www.bank-of-algeria.dz) and data derived from them
+    (extracted text, chunks, embedding vectors, corpus snapshot). These texts
+    remain the property of their institutional authors. They are included for
+    research and reproducibility only, and the Apache License is not applied to
+    them. The Bank of Algeria's reuse conditions have not been verified yet
+    (task T6, GitHub issue #6).
+
+  * Third-party models and software, which keep their own licenses:
+      - Qwen3-4B-Instruct-2507 (Alibaba Cloud / Qwen team): Apache-2.0
+      - multilingual-e5-small (Microsoft): MIT
+      - mmarco-mMiniLMv2-L12-H384 (cross-encoder): Apache-2.0
+      - llama.cpp (Georgi Gerganov and contributors): MIT
+      - the Python packages listed in requirements.txt and
+        deploy/requirements-deploy.txt
+
+  * PyMuPDF (AGPL-3.0, or a commercial license) is used by the corpus-building
+    tools (boa_pipeline/, agent_fr/audit.py, OCR benchmarks) and by the
+    optional PDF check of the quiz (local_app/quiz/verify.py --pdf). It is not
+    distributed with this repository and it is not needed to run the
+    application. If you redistribute those tools together with PyMuPDF, its
+    license applies to the combination.
+
+Code and documentation were produced with the assistance of an AI (Claude).
